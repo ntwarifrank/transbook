@@ -265,7 +265,7 @@ export default function AuthForm() {
             {/* Toggle Sign In/Up */}
             <div className="mt-8 text-center">
               <span className="text-gray-600">
-                {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+                {isSignUp ? 'Already have an account? ' : "Don&apos;t have an account? "}
               </span>
               <button
                 onClick={() => {
