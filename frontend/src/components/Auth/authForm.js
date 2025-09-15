@@ -101,7 +101,7 @@ export default function AuthForm() {
       setCurrentFeature(prev => (prev + 1) % Math.min(features.length, 4));
     }, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [features.length]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex">
@@ -281,7 +281,7 @@ export default function AuthForm() {
 
             {/* Terms */}
             <div className="mt-6 text-center text-sm text-gray-500 leading-relaxed">
-              By {isSignUp ? 'creating an account' : 'signing in'}, you agree to Rask's{' '}
+              By {isSignUp ? 'creating an account' : 'signing in'}, you agree to TransBook&apos;s{' '}
               <a href="#" className="text-blue-600 hover:text-blue-700 hover:underline transition-colors">Privacy Policy</a>
               {' '}and{' '}
               <a href="#" className="text-blue-600 hover:text-blue-700 hover:underline transition-colors">Terms of Service</a>

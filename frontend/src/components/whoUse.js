@@ -1,4 +1,4 @@
-import React from 'react';
+import Image from "next/image";
 
 const MarketingTranslatorComponent = () => {
   const userTypes = [
@@ -64,7 +64,7 @@ const MarketingTranslatorComponent = () => {
             <div className="flex flex-col lg:flex-row gap-8 items-start">
               <div className="w-full lg:w-80 flex-shrink-0">
                 <div className="relative overflow-hidden rounded-3xl shadow-2xl bg-white p-4">
-                  <img
+                  <Image
                     src={userTypes[0].image}
                     alt={userTypes[0].imageAlt}
                     className="w-full h-64 object-cover rounded-2xl"
@@ -85,7 +85,7 @@ const MarketingTranslatorComponent = () => {
             <div className="flex flex-col lg:flex-row-reverse gap-8 items-start">
               <div className="w-full lg:w-80 flex-shrink-0">
                 <div className="relative overflow-hidden rounded-3xl shadow-2xl bg-white p-4">
-                  <img
+                  <Image
                     src={userTypes[1].image}
                     alt={userTypes[1].imageAlt}
                     className="w-full h-64 object-cover rounded-2xl"
@@ -109,7 +109,7 @@ const MarketingTranslatorComponent = () => {
             <div className="flex flex-col lg:flex-row gap-8 items-start">
               <div className="w-full lg:w-80 flex-shrink-0">
                 <div className="relative overflow-hidden rounded-3xl shadow-2xl bg-white p-4">
-                  <img
+                  <Image
                     src={userTypes[2].image}
                     alt={userTypes[2].imageAlt}
                     className="w-full h-64 object-cover rounded-2xl"
@@ -130,7 +130,7 @@ const MarketingTranslatorComponent = () => {
             <div className="flex flex-col lg:flex-row-reverse gap-8 items-start">
               <div className="w-full lg:w-80 flex-shrink-0">
                 <div className="relative overflow-hidden rounded-3xl shadow-2xl bg-white p-4">
-                  <img
+                  <Image
                     src={userTypes[3].image}
                     alt={userTypes[3].imageAlt}
                     className="w-full h-64 object-cover rounded-2xl"
@@ -154,7 +154,7 @@ const MarketingTranslatorComponent = () => {
             <div className="flex flex-col lg:flex-row gap-8 items-start">
               <div className="w-full lg:w-80 flex-shrink-0">
                 <div className="relative overflow-hidden rounded-3xl shadow-2xl bg-white p-4">
-                  <img
+                  <Image
                     src={userTypes[4].image}
                     alt={userTypes[4].imageAlt}
                     className="w-full h-64 object-cover rounded-2xl"
@@ -175,7 +175,7 @@ const MarketingTranslatorComponent = () => {
             <div className="flex flex-col lg:flex-row-reverse gap-8 items-start">
               <div className="w-full lg:w-80 flex-shrink-0">
                 <div className="relative overflow-hidden rounded-3xl shadow-2xl bg-white p-4">
-                  <img
+                  <Image
                     src={userTypes[5].image}
                     alt={userTypes[5].imageAlt}
                     className="w-full h-64 object-cover rounded-2xl"

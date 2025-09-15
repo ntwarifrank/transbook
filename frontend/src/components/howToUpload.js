@@ -1,5 +1,5 @@
 "use client"
-import { Upload, Download, FileText, Globe, CheckCircle } from 'lucide-react';
+import { Upload, FileText, Globe, CheckCircle } from 'lucide-react';
 import Flag from "react-world-flags"
 
 const HowToUploadBook = () => {

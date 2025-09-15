@@ -3,7 +3,7 @@ import { useState, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFile, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { faChevronDown } from '@fortawesome/free-solid-svg-icons';
-import { Upload, X } from 'lucide-react';
+import { Upload} from 'lucide-react';
 import Flag from 'react-world-flags';
 
 const BookTranslationUpload = () => {
