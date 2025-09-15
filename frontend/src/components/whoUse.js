@@ -68,6 +68,8 @@ const MarketingTranslatorComponent = () => {
                     src={userTypes[0].image}
                     alt={userTypes[0].imageAlt}
                     className="w-full h-64 object-cover rounded-2xl"
+                    width={100}
+                    height={100}
                   />
                 </div>
               </div>
@@ -89,6 +91,8 @@ const MarketingTranslatorComponent = () => {
                     src={userTypes[1].image}
                     alt={userTypes[1].imageAlt}
                     className="w-full h-64 object-cover rounded-2xl"
+                    width={100}
+                    height={100}
                   />
                 </div>
               </div>
@@ -113,6 +117,8 @@ const MarketingTranslatorComponent = () => {
                     src={userTypes[2].image}
                     alt={userTypes[2].imageAlt}
                     className="w-full h-64 object-cover rounded-2xl"
+                    width={100}
+                    height={100}
                   />
                 </div>
               </div>
@@ -134,6 +140,8 @@ const MarketingTranslatorComponent = () => {
                     src={userTypes[3].image}
                     alt={userTypes[3].imageAlt}
                     className="w-full h-64 object-cover rounded-2xl"
+                    width={100}
+                    height={100}
                   />
                 </div>
               </div>
@@ -158,6 +166,8 @@ const MarketingTranslatorComponent = () => {
                     src={userTypes[4].image}
                     alt={userTypes[4].imageAlt}
                     className="w-full h-64 object-cover rounded-2xl"
+                    width={100}
+                    height={100}
                   />
                 </div>
               </div>
@@ -179,6 +189,8 @@ const MarketingTranslatorComponent = () => {
                     src={userTypes[5].image}
                     alt={userTypes[5].imageAlt}
                     className="w-full h-64 object-cover rounded-2xl"
+                    width={100}
+                    height={100}
                   />
                 </div>
               </div>
