@@ -105,7 +105,7 @@ const HowToUploadBook = () => {
   ];
 
   return (
-    <div className="bg-white py-20 px-4 px-10">
+    <div className="bg-white py-20 px-10">
       <div className="max-w-7xl mx-auto">
         {/* Header Section */}
         <div className="text-center mb-20">
