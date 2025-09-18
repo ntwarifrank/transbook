@@ -5,13 +5,7 @@ const nextConfig: NextConfig = {
     domains:[
       "framerusercontent.com",
     ]
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  }
 };
 
 export default nextConfig;

@@ -1,3 +1,4 @@
+
 import AuthForm from "../../components/Auth/authForm"
 
 const page = () => {

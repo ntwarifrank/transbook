@@ -2,11 +2,16 @@
 import React from 'react';
 import { useState } from 'react';
 import { Eye, EyeOff, Mic, Users, Languages, BookOpen, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react';
+import axios from "axios";
+import { useRouter } from 'next/navigation';
+import { Image } from 'next/image';
 
-export default function AuthForm() {
+function AuthForm() {
+  const router = useRouter();
   const [isSignUp, setIsSignUp] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
+    username: '',
     email: '',
     password: '',
     confirmPassword: ''
@@ -14,6 +19,19 @@ export default function AuthForm() {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [currentFeature, setCurrentFeature] = useState(0);
+  const [apiError, setApiError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // Configure axios defaults
+  const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+  
+  const axiosConfig = {
+    baseURL: API_BASE_URL,
+    timeout: 10000,
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  };
 
   const features = [
     {
@@ -56,6 +74,13 @@ export default function AuthForm() {
   const validateForm = () => {
     const newErrors = {};
     
+    // Username validation for signup
+    if (isSignUp && !formData.username.trim()) {
+      newErrors.username = 'Username is required';
+    } else if (isSignUp && formData.username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
+    }
+    
     if (!formData.email) {
       newErrors.email = 'Email is required';
     } else if (!validateEmail(formData.email)) {
@@ -64,8 +89,8 @@ export default function AuthForm() {
     
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
     
     if (isSignUp && formData.password !== formData.confirmPassword) {
@@ -78,21 +103,128 @@ export default function AuthForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Clear previous messages
+    setApiError('');
+    setSuccessMessage('');
+    
     if (!validateForm()) return;
     
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsLoading(false);
-    
-    console.log('Form submitted:', { ...formData, isSignUp });
+
+    try {
+      let response;
+      const endpoint = isSignUp ? '/register' : '/login';
+      
+      // Prepare data based on action
+      const submitData = isSignUp 
+        ? {
+            username: formData.username.trim(),
+            email: formData.email.trim().toLowerCase(),
+            password: formData.password
+          }
+        : {
+            email: formData.email.trim().toLowerCase(),
+            password: formData.password
+          };
+
+      response = await axios.post(endpoint, submitData, axiosConfig);
+
+      // Handle successful response
+      if (response.data) {
+        const { token, user, message } = response.data;
+        
+        // Store token if provided
+        if (token) {
+          localStorage.setItem('authToken', token);
+          localStorage.setItem('user', JSON.stringify(user));
+        }
+
+        setSuccessMessage(message || `${isSignUp ? 'Account created' : 'Login'} successful!`);
+        
+        isSignUp ? router.push("/login") : router.push("/")
+        
+        // Reset form on success
+        setFormData({
+          username: '',
+          email: '',
+          password: '',
+          confirmPassword: ''
+        });
+
+        // Redirect or update UI state after success
+        setTimeout(() => {
+          // You can add navigation logic here
+          console.log('Redirecting to dashboard...');
+        }, 1500);
+      }
+
+    } catch (error) {
+      console.error('Auth error:', error);
+      
+      // Handle different error types
+      if (error.response) {
+        // Server responded with error status
+        const { status, data } = error.response;
+        
+        switch (status) {
+          case 400:
+            setApiError(data.message || 'Invalid input. Please check your information.');
+            // Handle field-specific errors if provided by backend
+            if (data.errors) {
+              setErrors(data.errors);
+            }
+            break;
+          case 401:
+            setApiError('Invalid credentials. Please try again.');
+            break;
+          case 409:
+            setApiError('Email already exists. Please try signing in instead.');
+            break;
+          case 422:
+            setApiError(data.message || 'Validation failed. Please check your input.');
+            break;
+          case 429:
+            setApiError('Too many attempts. Please try again later.');
+            break;
+          case 500:
+            setApiError('Server error. Please try again later.');
+            break;
+          default:
+            setApiError(data.message || 'An unexpected error occurred.');
+        }
+      } else if (error.request) {
+        // Network error
+        setApiError('Network error. Please check your connection and try again.');
+      } else {
+        // Other error
+        setApiError('An unexpected error occurred. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Clear field-specific errors
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
+    
+    // Clear API error when user starts typing
+    if (apiError) {
+      setApiError('');
+    }
+  };
+
+  const toggleAuthMode = () => {
+    setIsSignUp(!isSignUp);
+    setErrors({});
+    setApiError('');
+    setSuccessMessage('');
+    setFormData({ username: '', email: '', password: '', confirmPassword: '' });
   };
 
   // Auto-rotate features
@@ -115,11 +247,14 @@ export default function AuthForm() {
           <div className="max-w-md mx-auto w-full">
             {/* Logo */}
             <div className="mb-10">
-              <div className="flex items-center gap-2 mb-8">
-                <div className="w-18 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-lg">Trans</span>
+              <div className="flex flex-row">
+                <Image src="/logo.png" width={40} height={40}></Image>
+                <div className="flex items-center">
+                  <div className="bg-gradient-to-r bg-clip-text text-transparent from-blue-600 to-purple-600 pl-2 py-1 font-bold text-2xl rounded-xl">
+                    lexi
+                  </div>
+                  <span className="ml-0 text-2xl font-bold text-gray-900">vana</span>
                 </div>
-                <span className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Book</span>
               </div>
               <h1 className="text-4xl font-bold text-gray-900 mb-3 leading-tight">
                 Welcome to TransBook AI
@@ -128,6 +263,21 @@ export default function AuthForm() {
                 Join <span className="font-semibold text-blue-600">2+ million users</span> to translate any video in minutes with AI
               </p>
             </div>
+
+            {/* Success/Error Messages */}
+            {successMessage && (
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-2 text-green-700">
+                <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                <span className="text-sm font-medium">{successMessage}</span>
+              </div>
+            )}
+
+            {apiError && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-700">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <span className="text-sm font-medium">{apiError}</span>
+              </div>
+            )}
 
             {/* Google Sign Up Button */}
             <button className="w-full flex items-center justify-center gap-4 py-4 px-6 border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 hover:shadow-md transition-all duration-200 mb-8 group">
@@ -148,7 +298,32 @@ export default function AuthForm() {
             </div>
 
             {/* Form */}
-            <div className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {isSignUp && (
+                <div>
+                  <div className="space-y-2">
+                    <label className="block text-gray-800 font-semibold text-sm">Username</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Enter your username"
+                        value={formData.username}
+                        onChange={(e) => handleInputChange('username', e.target.value)}
+                        className={`w-full px-4 py-4 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-gray-900 placeholder-gray-400 ${
+                          errors.username ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      />
+                      {errors.username && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <AlertCircle className="w-5 h-5 text-red-500" />
+                        </div>
+                      )}
+                    </div>
+                    {errors.username && <p className="text-red-500 text-sm flex items-center gap-1"><AlertCircle className="w-4 h-4" />{errors.username}</p>}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label className="block text-gray-800 font-semibold text-sm">Email Address</label>
                 <div className="relative">
@@ -170,13 +345,12 @@ export default function AuthForm() {
                 {errors.email && <p className="text-red-500 text-sm flex items-center gap-1"><AlertCircle className="w-4 h-4" />{errors.email}</p>}
               </div>
 
-              { !isSignUp && (
-                <div className="space-y-2">
+              <div className="space-y-2">
                 <label className="block text-gray-800 font-semibold text-sm">Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
-                    placeholder="Your password"
+                    placeholder={isSignUp ? "Create a strong password" : "Your password"}
                     value={formData.password}
                     onChange={(e) => handleInputChange('password', e.target.value)}
                     className={`w-full px-4 py-4 pr-12 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-gray-900 placeholder-gray-400 ${
@@ -193,61 +367,32 @@ export default function AuthForm() {
                 </div>
                 {errors.password && <p className="text-red-500 text-sm flex items-center gap-1"><AlertCircle className="w-4 h-4" />{errors.password}</p>}
               </div>
-              )
-
-              }
 
               {isSignUp && (
-                <div>
-                    <div className="space-y-2">
-                    <label className="block text-gray-800 font-semibold text-sm">Password</label>
-                    <div className="relative">
+                <div className="space-y-2">
+                  <label className="block text-gray-800 font-semibold text-sm">Confirm Password</label>
+                  <div className="relative">
                     <input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Create a strong password"
-                        value={formData.password}
-                        onChange={(e) => handleInputChange('password', e.target.value)}
-                        className={`w-full px-4 py-4 pr-12 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-gray-900 placeholder-gray-400 ${
-                        errors.password ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                      type="password"
+                      placeholder="Confirm your password"
+                      value={formData.confirmPassword}
+                      onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                      className={`w-full px-4 py-4 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-gray-900 placeholder-gray-400 ${
+                        errors.confirmPassword ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}
                     />
-                    <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
-                    >
-                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                    </button>
-                    </div>
-                    {errors.password && <p className="text-red-500 text-sm flex items-center gap-1"><AlertCircle className="w-4 h-4" />{errors.password}</p>}
-                </div>
-
-                    
-                    <div className="space-y-2">
-                    <label className="block text-gray-800 font-semibold text-sm">Confirm Password</label>
-                    <div className="relative">
-                        <input
-                        type="password"
-                        placeholder="Confirm your password"
-                        value={formData.confirmPassword}
-                        onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                        className={`w-full px-4 py-4 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-gray-900 placeholder-gray-400 ${
-                            errors.confirmPassword ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                        />
-                        {formData.confirmPassword && formData.password === formData.confirmPassword && (
-                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                            <CheckCircle className="w-5 h-5 text-green-500" />
-                        </div>
-                        )}
-                    </div>
-                    {errors.confirmPassword && <p className="text-red-500 text-sm flex items-center gap-1"><AlertCircle className="w-4 h-4" />{errors.confirmPassword}</p>}
-                    </div>
+                    {formData.confirmPassword && formData.password === formData.confirmPassword && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      </div>
+                    )}
+                  </div>
+                  {errors.confirmPassword && <p className="text-red-500 text-sm flex items-center gap-1"><AlertCircle className="w-4 h-4" />{errors.confirmPassword}</p>}
                 </div>
               )}
 
               <button
-                onClick={handleSubmit}
+                type="submit"
                 disabled={isLoading}
                 className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-blue-400 disabled:to-blue-500 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:transform-none disabled:cursor-not-allowed"
               >
@@ -260,19 +405,15 @@ export default function AuthForm() {
                   isSignUp ? 'Create Account' : 'Sign In'
                 )}
               </button>
-            </div>
+            </form>
 
             {/* Toggle Sign In/Up */}
             <div className="mt-8 text-center">
               <span className="text-gray-600">
-                {isSignUp ? 'Already have an account? ' : "Don&apos;t have an account? "}
+                {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
               </span>
               <button
-                onClick={() => {
-                  setIsSignUp(!isSignUp);
-                  setErrors({});
-                  setFormData({ email: '', password: '', confirmPassword: '' });
-                }}
+                onClick={toggleAuthMode}
                 className="text-blue-600 hover:text-blue-700 font-semibold transition-colors hover:underline"
               >
                 {isSignUp ? 'Sign In' : 'Sign Up'}
@@ -281,7 +422,7 @@ export default function AuthForm() {
 
             {/* Terms */}
             <div className="mt-6 text-center text-sm text-gray-500 leading-relaxed">
-              By {isSignUp ? 'creating an account' : 'signing in'}, you agree to TransBook&apos;s{' '}
+              By {isSignUp ? 'creating an account' : 'signing in'}, you agree to TransBook's{' '}
               <a href="#" className="text-blue-600 hover:text-blue-700 hover:underline transition-colors">Privacy Policy</a>
               {' '}and{' '}
               <a href="#" className="text-blue-600 hover:text-blue-700 hover:underline transition-colors">Terms of Service</a>
@@ -354,3 +495,5 @@ export default function AuthForm() {
     </div>
   );
 }
+
+export default AuthForm

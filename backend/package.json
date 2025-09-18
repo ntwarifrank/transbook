@@ -1,28 +1,54 @@
 {
   "name": "backend",
-  "version": "1.0.0",
-  "description": "",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Enhanced document translation service with rate limiting",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "type": "module",
-  "author": "",
-  "license": "ISC",
   "dependencies": {
+    "@vitalets/google-translate-api": "^9.2.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
+    "helmet": "^7.1.0",
+    "mammoth": "^1.6.0",
+    "mongoose": "^8.3.0",
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1",
+    "puppeteer": "^22.6.0",
+    "sharp": "^0.33.3",
+    "tesseract.js": "^5.0.5",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^2.7.0",
-    "compression": "^1.8.1",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.2",
-    "express": "^5.1.0",
-    "express-rate-limit": "^8.1.0",
-    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.18.1",
-    "multer": "^2.0.2",
     "nodemailer": "^7.0.6",
-    "sharp": "^0.34.3"
-  }
+    "pdf-lib": "^1.17.1",
+    "pdf-poppler": "^0.2.1",
+    "pdf2pic": "^3.2.0",
+    "pdfjs-dist": "^5.4.149"
+
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  },
+  "optionalDependencies": {
+    "pdfjs-dist": "^4.1.392"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "translation",
+    "pdf",
+    "document",
+    "google-translate",
+    "rate-limiting",
+    "ocr"
+  ]
 }
