@@ -60,13 +60,15 @@ const Navigation = ({ user = null, onLogout }) => {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex-shrink-0 flex flex-row">
-            <Image src="/logo.png" width={40} height={40} alt='image'></Image>
-            <div className="flex items-center">
-              <div className="bg-gradient-to-r bg-clip-text text-transparent from-blue-600 to-purple-600 pl-2 py-1 font-bold text-2xl rounded-xl">
-                lexi
-              </div>
-              <span className="ml-0 text-2xl font-bold text-gray-900">vana</span>
-            </div>
+            <Link href={"/"} className='flex-shrink-0 flex flex-row'>
+               <Image src="/logo.png" width={40} height={40} alt='image'></Image>
+                <div className="flex items-center">
+                  <div className="bg-gradient-to-r bg-clip-text text-transparent from-blue-600 to-purple-600 pl-2 py-1 font-bold text-2xl rounded-xl">
+                    lexi
+                  </div>
+                  <span className="ml-0 text-2xl font-bold text-gray-900">vana</span>
+                </div>
+            </Link>
           </div>
 
           {/* Desktop Navigation */}

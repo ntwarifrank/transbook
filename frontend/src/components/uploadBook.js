@@ -527,10 +527,10 @@ const BookTranslationUpload = () => {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold text-gray-900 mb-4">
-            Enhanced Document Translation
+            Professional Book Translation
           </h1>
           <p className="text-xl text-gray-600">
-            AI Translation with Smart Rate Limiting & Error Recovery
+            AI-Powered Book Translation - No Registration Required
           </p>
           <div className="flex items-center justify-center mt-4 space-x-4 text-sm">
             <div className={`flex items-center px-3 py-1 rounded-full ${
