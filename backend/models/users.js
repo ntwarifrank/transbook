@@ -2,6 +2,11 @@
 import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema({
+    clerkId: {
+        type: String,
+        required: [true, 'Clerk ID is required'],
+        unique: true,
+    },
     username: {
         type: String,
         required: [true, 'Please provide username'],
@@ -18,6 +23,25 @@ const userSchema = new mongoose.Schema({
         required: [true, 'Please provide password'],
         minlength: [6, 'Password must be at least 6 characters'],
         select: false // Don't include password in queries by default
+    },
+    subscriptionPlan: {
+        type: String,
+        enum: ['FREE', 'BASIC', 'PRO', 'BUSINESS', 'ENTERPRISE'],
+        default: 'FREE'
+    },
+    subscriptionStatus: {
+        type: String,
+        enum: ['active', 'inactive', 'cancelled', 'past_due'],
+        default: 'active'
+    },
+    paddleCustomerId: {
+        type: String,
+        unique: true,
+        sparse: true // Allows multiple null values
+    },
+    wordCredit: {
+        type: Number,
+        default: 5000 // Default word credit for the FREE plan
     },
   
 }, {

@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { Eye, EyeOff, Mic, Users, Languages, BookOpen, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react';
 import axios from "axios";
 import { useRouter } from 'next/navigation';
-import { Image } from 'next/image';
+import Image from 'next/image';
+import { useAuthStore } from '../../stores/authStore';
 
-function AuthForm() {
+const AuthForm = () => {
   const router = useRouter();
   const [isSignUp, setIsSignUp] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -21,6 +22,8 @@ function AuthForm() {
   const [currentFeature, setCurrentFeature] = useState(0);
   const [apiError, setApiError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  const setAuth = useAuthStore( state => state.setAuth);
 
   // Configure axios defaults
   const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
@@ -138,11 +141,15 @@ function AuthForm() {
         if (token) {
           localStorage.setItem('authToken', token);
           localStorage.setItem('user', JSON.stringify(user));
+
+          if(!isSignUp){
+            setAuth(user, token)
+          }
         }
 
         setSuccessMessage(message || `${isSignUp ? 'Account created' : 'Login'} successful!`);
         
-        isSignUp ? router.push("/login") : router.push("/")
+        isSignUp ? setIsSignUp(false) : router.push("/")
         
         // Reset form on success
         setFormData({

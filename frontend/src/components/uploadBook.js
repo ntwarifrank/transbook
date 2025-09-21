@@ -1,5 +1,8 @@
 "use client"
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
+import PricingModal from './PricingModal';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFile, faTrash, faCheck, faSpinner, faDownload, faExclamationTriangle, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import { faChevronDown } from '@fortawesome/free-solid-svg-icons';
@@ -25,9 +28,14 @@ const BookTranslationUpload = () => {
   const [extractedContent, setExtractedContent] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
   const [networkStatus, setNetworkStatus] = useState('online');
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [translationCost, setTranslationCost] = useState(0);
+  const [pendingTranslation, setPendingTranslation] = useState(null);
   const fileInputRef = useRef(null);
   const progressIntervalRef = useRef(null);
   const extractionIntervalRef = useRef(null);
+  const router = useRouter();
+  const { user, isSignedIn } = useUser();
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -55,6 +63,28 @@ const BookTranslationUpload = () => {
   ];
 
   const acceptedFormats = ['PDF', 'DOC', 'DOCX', 'TXT'];
+
+  useEffect(() => {
+    // Check for a pending translation after login/signup
+    const pendingTranslationData = localStorage.getItem('pendingTranslation');
+    if (pendingTranslationData && isSignedIn) {
+      const data = JSON.parse(pendingTranslationData);
+      // Restore state and immediately start the translation
+      setUploadedFile({
+        name: data.fileName,
+        extractedContent: {
+          text: data.text,
+          html: data.html,
+          structure: data.structure,
+        },
+        uploaded: true,
+      });
+      setSelectedLanguage(languages.find(l => l.code === data.targetLanguage));
+      setSelectedTone(data.tone);
+      handleTranslate(); // This will now proceed as a signed-in user
+      localStorage.removeItem('pendingTranslation');
+    }
+  }, [isSignedIn]);
 
   // Check network connectivity
   useEffect(() => {
@@ -360,7 +390,37 @@ const BookTranslationUpload = () => {
     }
   };
 
+  const handleConfirmPayment = () => {
+    // Store translation details and redirect to sign up
+    const translationData = {
+      text: uploadedFile.extractedContent.text,
+      html: uploadedFile.extractedContent.html,
+      structure: uploadedFile.extractedContent.structure,
+      targetLanguage: selectedLanguage.code,
+      tone: selectedTone,
+      fileName: uploadedFile.name,
+    };
+    localStorage.setItem('pendingTranslation', JSON.stringify(translationData));
+    router.push('/sign-up');
+  };
+
   const handleTranslate = async () => {
+    // Safeguard to ensure content and metadata are ready
+    if (!uploadedFile?.extractedContent?.metadata?.words) {
+      setUploadError({
+        message: 'File analysis is not yet complete.',
+        suggestions: ['Please wait for the document processing to finish before starting the translation.'],
+      });
+      return;
+    }
+        if (!isSignedIn) {
+      const wordCount = uploadedFile.extractedContent.metadata.words;
+      const cost = wordCount * 0.005;
+      setTranslationCost(cost);
+      setShowPricingModal(true);
+      return;
+    }
+
     if (!uploadedFile?.extractedContent?.text) {
       setUploadError({
         message: 'No text content available',
@@ -508,6 +568,15 @@ const BookTranslationUpload = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-12 px-4">
       {/* Network status indicator */}
+      {showPricingModal && (
+        <PricingModal 
+          wordCount={uploadedFile.extractedContent.metadata.words}
+          cost={translationCost}
+          onConfirm={handleConfirmPayment}
+          onCancel={() => setShowPricingModal(false)}
+        />
+      )}
+
       {networkStatus === 'offline' && (
         <div className="fixed top-0 left-0 right-0 bg-red-600 text-white py-2 px-4 text-center z-50">
           <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2" />

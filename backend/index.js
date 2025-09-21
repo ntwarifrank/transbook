@@ -6,8 +6,14 @@ import helmet from "helmet";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
 
+// Import User model
+import User from "./models/users.js";
+
 // Import existing auth routes
 import { changePassword, getProfile, login, register } from "./routes/auth/auth.js";
+
+// Import Clerk webhook route
+import clerkWebhookRouter from './routes/clerk/webhook.js';
 
 // Import enhanced translation routes
 import { 
@@ -19,6 +25,9 @@ import {
   cleanupTranslation,
   upload 
 } from "./routes/translation/translation.js";
+
+// Import the worker to start processing jobs
+import './workers/translationWorker.js';
 
 const app = express();
 
@@ -144,6 +153,221 @@ const connectDB = async (retryCount = 0) => {
 
 connectDB();
 
+// subscription routes
+// Paddle configuration from environment
+const PADDLE_API_KEY = process.env.PADDLE_API_KEY;
+const PADDLE_VENDOR_ID = process.env.PADDLE_VENDOR_ID;
+const PADDLE_WEBHOOK_SECRET = process.env.PADDLE_WEBHOOK_SECRET;
+
+// Plan to Price ID mapping (replace with your actual IDs)
+const PLAN_DETAILS = {
+  'FREE': { wordCredit: 5000 },
+  'BASIC': { wordCredit: 50000 },
+  'PRO': { wordCredit: 200000 },
+  'BUSINESS': { wordCredit: 1000000 },
+  'ENTERPRISE': { wordCredit: Infinity }, // Or a very large number
+};
+
+const PLAN_PRICE_IDS = {
+  'FREE': null,
+  'BASIC': process.env.PADDLE_BASIC_PRICE_ID,
+  'PRO': process.env.PADDLE_PRO_PRICE_ID,
+  'ENTERPRISE': process.env.PADDLE_ENTERPRISE_PRICE_ID
+};
+
+// Create Paddle checkout
+app.post('/api/paddle/create-checkout', async (req, res) => {
+  try {
+    const { planName, planPrice, userEmail, customData } = req.body;
+
+    // Validate input
+    if (!planName || !userEmail) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Handle free plan
+    if (planName === 'FREE') {
+      // Activate free plan in your database
+      // await activateFreePlan(userEmail);
+      return res.json({ 
+        success: true, 
+        message: 'Free plan activated',
+        redirect: '/dashboard'
+      });
+    }
+
+    const priceId = PLAN_PRICE_IDS[planName];
+    if (!priceId) {
+      return res.status(400).json({ error: 'Invalid plan selected' });
+    }
+
+    // Prepare checkout data for Paddle
+    const checkoutData = {
+      items: [
+        {
+          priceId: priceId,
+          quantity: 1
+        }
+      ],
+      customer: {
+        email: userEmail
+      },
+      customData: {
+        userId: customData?.userId || 'anonymous',
+        planName: planName,
+        planPrice: planPrice,
+        source: customData?.source || 'api',
+        timestamp: new Date().toISOString()
+      },
+      settings: {
+        displayMode: 'overlay',
+        theme: 'light',
+        locale: 'en',
+        allowLogout: false,
+        successUrl: `${process.env.FRONTEND_URL}/payment/success`,
+        closeUrl: `${process.env.FRONTEND_URL}/pricing`
+      }
+    };
+
+    res.json({
+      success: true,
+      checkoutData: checkoutData
+    });
+
+  } catch (error) {
+    console.error('Checkout creation error:', error);
+    res.status(500).json({ error: 'Failed to create checkout' });
+  }
+});
+
+// Paddle webhook handler
+app.post('/api/paddle/webhook', (req, res) => {
+  try {
+    const signature = req.headers['paddle-signature'];
+    const payload = req.body;
+
+    // Verify webhook signature (important for security)
+    // const isValid = verifyPaddleSignature(signature, payload, PADDLE_WEBHOOK_SECRET);
+    // if (!isValid) {
+    //   return res.status(400).send('Invalid signature');
+    // }
+
+    console.log('Paddle webhook received:', payload);
+
+    // Handle different webhook events
+    switch (payload.event_type || payload.alert_name) {
+      case 'transaction.completed':
+      case 'payment_succeeded':
+        handlePaymentSucceeded(payload);
+        break;
+      
+      case 'subscription.created':
+        handleSubscriptionCreated(payload);
+        break;
+      
+      case 'subscription.updated':
+        handleSubscriptionUpdated(payload);
+        break;
+      
+      case 'subscription.cancelled':
+        handleSubscriptionCancelled(payload);
+        break;
+      
+      default:
+        console.log('Unhandled webhook event:', payload.event_type || payload.alert_name);
+    }
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('Webhook processing error:', error);
+    res.status(500).send('Webhook Error');
+  }
+});
+
+// --- Paddle Webhook Logic ---
+
+/**
+ * Updates a user's subscription details in the database.
+ * @param {string} userEmail - The email of the user to update.
+ * @param {string} paddleCustomerId - The customer ID from Paddle.
+ * @param {string} planName - The new subscription plan name.
+ * @param {string} status - The new subscription status.
+ */
+async function updateUserSubscription(userEmail, paddleCustomerId, planName, status) {
+  try {
+    const planDetails = PLAN_DETAILS[planName.toUpperCase()];
+    if (!planDetails) {
+      console.error(`Invalid plan name: ${planName}`);
+      return;
+    }
+
+    const user = await User.findOneAndUpdate(
+      { email: userEmail },
+      {
+        paddleCustomerId,
+        subscriptionPlan: planName.toUpperCase(),
+        subscriptionStatus: status,
+        wordCredit: planDetails.wordCredit,
+      },
+      { new: true, upsert: true } // Create user if not exists, return new doc
+    );
+
+    console.log(`✅ User subscription updated successfully for ${user.email} to ${planName}`);
+  } catch (error) {
+    console.error(`❌ Error updating user subscription for ${userEmail}:`, error);
+  }
+}
+
+function handleSubscriptionCreated(data) {
+  const userEmail = data.customer.email;
+  const paddleCustomerId = data.customer.id;
+  const planName = data.items[0].price.product.name;
+  const status = data.status;
+
+  console.log(`Processing 'subscription.created' for ${userEmail}`);
+  updateUserSubscription(userEmail, paddleCustomerId, planName, status);
+}
+
+function handleSubscriptionUpdated(data) {
+  const userEmail = data.customer.email;
+  const paddleCustomerId = data.customer.id;
+  const planName = data.items[0].price.product.name;
+  const status = data.status;
+
+  console.log(`Processing 'subscription.updated' for ${userEmail}`);
+  updateUserSubscription(userEmail, paddleCustomerId, planName, status);
+}
+
+function handleSubscriptionCancelled(data) {
+  const userEmail = data.customer.email;
+  const paddleCustomerId = data.customer.id;
+
+  console.log(`Processing 'subscription.cancelled' for ${userEmail}`);
+  // When a subscription is cancelled, we can set the plan to FREE
+  // or handle it based on your business logic (e.g., access until end of billing period)
+  updateUserSubscription(userEmail, paddleCustomerId, 'FREE', 'cancelled');
+}
+
+// Get user subscription status
+app.get('/api/user/:email/subscription', async (req, res) => {
+  try {
+    const { email } = req.params;
+    
+    // Query your database for user's subscription
+    // const subscription = await getUserSubscription(email);
+    
+    res.json({
+      email: email,
+      plan: 'basic', // Replace with actual plan
+      status: 'active', // Replace with actual status
+      expiryDate: new Date(),
+      features: []
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get subscription' });
+  }
+});
+
 // Enhanced health check route
 app.get("/", (req, res) => {
     res.json({
@@ -166,7 +390,13 @@ app.get("/", (req, res) => {
 });
 
 // ============================================
-// AUTH ROUTES
+// CLERK WEBHOOK ROUTE
+// ============================================
+app.use('/api/clerk-webhook', clerkWebhookRouter);
+
+
+// ============================================
+// AUTH ROUTES (To be deprecated by Clerk)
 // ============================================
 app.post("/register", register);
 app.post("/login", login);
@@ -186,14 +416,14 @@ app.get("/api/extraction-progress/:extractionId", getExtractionProgress);
 // Start complete translation with enhanced rate limiting
 app.post("/api/translate-document-complete", translationLimiter, translateUploadedDocument);
 
-// Get translation progress
-app.get("/api/translation-progress/:translationId", getTranslationProgress);
+// Get translation progress using the jobId
+app.get("/api/translation-progress/:jobId", getTranslationProgress);
 
-// Download translated PDF
+// Download translated PDF using the translationId
 app.get("/api/download-pdf/:translationId", downloadTranslatedPdf);
 
-// Clean up translation data
-app.delete("/api/cleanup/:translationId", cleanupTranslation);
+// Clean up translation data using both IDs
+app.delete("/api/cleanup/:translationId/:jobId?", cleanupTranslation);
 
 // Translation service health check
 app.get("/api/translation/health", (req, res) => {

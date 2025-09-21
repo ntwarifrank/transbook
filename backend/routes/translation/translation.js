@@ -1,4 +1,4 @@
-// routes/translation/translation.js - Optimized version for faster translation
+// routes/translation/translation.js - Refactored for background processing
 
 // --- Imports ---
 import multer from 'multer';
@@ -11,6 +11,10 @@ import sharp from 'sharp';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import puppeteer from 'puppeteer';
+
+// --- Local Imports ---
+import translationQueue from '../../queues/translationQueue.js';
+import connection from '../../config/redis.js';
 
 // PDF Parsers
 import pdf from 'pdf-parse';
@@ -28,9 +32,9 @@ try {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Enhanced progress tracking (shared state)
-const translationProgress = new Map();
-const translationCache = new Map(); // Cache for translated chunks
+// Progress tracking for the initial file extraction stage.
+// Translation progress is now handled by BullMQ jobs.
+const extractionProgress = new Map();
 
 // Optimized rate limiting configuration
 const RATE_LIMIT = {
@@ -251,7 +255,7 @@ export const upload = multer({
 async function extractTextFromPDF(buffer, translationId = null) {
   console.log('📄 Starting optimized PDF text extraction...');
   if (translationId) {
-    translationProgress.set(translationId, {
+    extractionProgress.set(translationId, {
       stage: 'Analyzing PDF content...',
       progress: 5,
       step: 'PDF Analysis'
@@ -261,7 +265,7 @@ async function extractTextFromPDF(buffer, translationId = null) {
   // Try pdf-parse first (most reliable)
   try {
     if (translationId) {
-      translationProgress.set(translationId, {
+      extractionProgress.set(translationId, {
         stage: 'Extracting text with pdf-parse...',
         progress: 20,
         step: 'Text Extraction'
@@ -287,7 +291,7 @@ async function extractTextFromPDF(buffer, translationId = null) {
       console.log(`✅ PDF parsed: ${metadata.pages} pages, ${metadata.words} words`);
       
       if (translationId) {
-        translationProgress.set(translationId, {
+        extractionProgress.set(translationId, {
           stage: 'PDF text extraction completed',
           progress: 90,
           step: 'Processing Complete'
@@ -495,18 +499,18 @@ function createOptimizedChunks(text, maxChunkSize = RATE_LIMIT.chunkSize) {
 /**
  * Enhanced translation with parallel processing and caching.
  */
-async function translateTextWithProgress(text, targetLang, translationId) {
-  console.log(`🚀 Starting optimized translation: ${text.length} characters`);
+async function translateTextWithProgress(text, targetLang, job) {
+  console.log(`🚀 [Job ${job.id}] Starting optimized translation: ${text.length} characters`);
 
   // Create optimized chunks
   const chunks = createOptimizedChunks(text);
-  console.log(`📝 Split into ${chunks.length} optimized chunks`);
+  console.log(`📝 [Job ${job.id}] Split into ${chunks.length} optimized chunks`);
 
   const totalChunks = chunks.length;
-  translationProgress.set(translationId, {
-    stage: `Starting parallel translation of ${totalChunks} segments...`,
+  await job.updateProgress({
+    stage: `Translating ${totalChunks} segments...`,
     progress: 10,
-    step: 'Translation Started',
+    step: 'Translating',
     totalChunks,
     completedChunks: 0
   });
@@ -515,7 +519,7 @@ async function translateTextWithProgress(text, targetLang, translationId) {
   const translatedChunks = await advancedTranslator.translateBatch(chunks, targetLang);
 
   // Update progress as batches complete
-  translationProgress.set(translationId, {
+  await job.updateProgress({
     stage: 'Combining translated segments...',
     progress: 95,
     step: 'Finalizing Translation',
@@ -524,7 +528,7 @@ async function translateTextWithProgress(text, targetLang, translationId) {
   });
 
   const finalText = translatedChunks.join(' ');
-  console.log(`✅ Optimized translation completed: ${finalText.length} characters`);
+  console.log(`✅ [Job ${job.id}] Optimized translation completed: ${finalText.length} characters`);
   
   return finalText;
 }
@@ -682,57 +686,19 @@ async function translateDocumentComplete(text, html, structure, targetLang, tran
   try {
     console.log(`🚀 Starting optimized complete translation to ${targetLang}`);
 
-    translationProgress.set(translationId, {
-      stage: 'Initializing optimized translation process...',
-      progress: 5,
-      step: 'Initialization',
-      startTime: new Date().toISOString()
+    const job = await translationQueue.add('translate-document', {
+      text,
+      html,
+      structure,
+      targetLang,
+      originalFileName,
+      translationId,
     });
 
-    // Translate the text with advanced parallel processing
-    const translatedText = await translateTextWithProgress(text, targetLang, translationId);
-
-    translationProgress.set(translationId, {
-      stage: 'Creating optimized HTML structure...',
-      progress: 88,
-      step: 'HTML Generation'
-    });
-
-    // Create better translated HTML
-    const translatedHtml = await createTranslatedHtml(html, text, translatedText);
-
-    translationProgress.set(translationId, {
-      stage: 'Generating professional PDF...',
-      progress: 93,
-      step: 'PDF Generation'
-    });
-
-    const pdfBuffer = await generatePdfFromHtml(translatedHtml, originalFileName);
-
-    translationProgress.set(translationId, {
-      stage: 'Translation completed successfully!',
-      progress: 100,
-      step: 'Complete',
-      completed: true,
-      result: translatedText,
-      translatedHtml,
-      pdfBuffer: pdfBuffer.toString('base64'),
-      pdfSize: pdfBuffer.length,
-      completedAt: new Date().toISOString(),
-      cacheStats: advancedTranslator.getCacheStats()
-    });
-
-    console.log(`🎉 Optimized translation completed successfully!`);
+    console.log(`📥 Job ${job.id} added to the queue for translationId: ${translationId}`);
 
   } catch (error) {
-    console.error('💥 Optimized translation process failed:', error);
-    translationProgress.set(translationId, {
-      stage: `Translation failed: ${error.message}`,
-      progress: 0,
-      error: error.message,
-      failed: true,
-      failedAt: new Date().toISOString()
-    });
+    console.error('💥 Translation process failed:', error);
   }
 }
 
@@ -763,7 +729,68 @@ async function createTranslatedHtml(originalHtml, originalText, translatedText) 
   return translatedHtml;
 }
 
-// --- Route Handlers (keeping the same interface) ---
+// --- Background Job Handler ---
+
+/**
+ * This is the core translation logic that will be executed by the background worker.
+ */
+export async function performTranslation(job) {
+  const { text, html, structure, targetLang, originalFileName, translationId } = job.data;
+  try {
+    console.log(`🚀 [Job ${job.id}] Starting complete translation to ${targetLang}`);
+
+    await job.updateProgress({
+      stage: 'Initializing translation process...',
+      progress: 5,
+      step: 'Initialization',
+      startTime: new Date().toISOString()
+    });
+
+    // Translate the text with advanced parallel processing
+    const translatedText = await translateTextWithProgress(text, targetLang, job);
+
+    await job.updateProgress({
+      stage: 'Creating translated HTML structure...',
+      progress: 88,
+      step: 'HTML Generation'
+    });
+
+    // Create better translated HTML
+    const translatedHtml = await createTranslatedHtml(html, text, translatedText);
+
+    await job.updateProgress({
+      stage: 'Generating professional PDF...',
+      progress: 93,
+      step: 'PDF Generation'
+    });
+
+    const pdfBuffer = await generatePdfFromHtml(translatedHtml, originalFileName);
+
+    // Store the final PDF in Redis with a 1-hour expiry
+    const redisKey = `translation:pdf:${translationId}`;
+    await connection.set(redisKey, pdfBuffer.toString('base64'), 'EX', 3600);
+
+    await job.updateProgress({
+      stage: 'Translation completed successfully!',
+      progress: 100,
+      step: 'Complete',
+      completed: true,
+      pdfSize: pdfBuffer.length,
+      completedAt: new Date().toISOString(),
+      cacheStats: advancedTranslator.getCacheStats()
+    });
+
+    console.log(`🎉 [Job ${job.id}] Translation completed successfully!`);
+    return { success: true, translationId };
+
+  } catch (error) {
+    console.error(`💥 [Job ${job.id}] Translation process failed:`, error);
+    // Let BullMQ know the job has failed
+    throw error;
+  }
+}
+
+// --- API Route Handlers ---
 
 export const uploadDocument = async (req, res) => {
   try {
@@ -786,7 +813,7 @@ export const uploadDocument = async (req, res) => {
       // Process PDF asynchronously
       extractTextFromFile(req.file, extractionId)
         .then(extractedContent => {
-          translationProgress.set(extractionId, {
+          extractionProgress.set(extractionId, {
             stage: 'Document extraction completed successfully',
             progress: 100,
             completed: true,
@@ -798,7 +825,7 @@ export const uploadDocument = async (req, res) => {
         })
         .catch(error => {
           console.error(`💥 PDF extraction failed: ${extractionId}`, error);
-          translationProgress.set(extractionId, {
+          extractionProgress.set(extractionId, {
             stage: 'Document extraction failed',
             progress: 0,
             error: error.message,
@@ -846,7 +873,7 @@ export const uploadDocument = async (req, res) => {
 
 export const getExtractionProgress = (req, res) => {
   const { extractionId } = req.params;
-  const progress = translationProgress.get(extractionId);
+  const progress = extractionProgress.get(extractionId);
 
   if (!progress) {
     return res.status(404).json({
@@ -871,7 +898,7 @@ export const translateUploadedDocument = async (req, res) => {
       });
     }
 
-    if (text.length > 200000) { // Increased limit
+    if (text.length > 200000) {
       return res.status(400).json({
         success: false,
         message: 'Text too long. Maximum 200,000 characters allowed.',
@@ -880,117 +907,129 @@ export const translateUploadedDocument = async (req, res) => {
       });
     }
 
+    // This ID is used to retrieve the final PDF from Redis
     const translationId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
-    console.log(`Starting optimized translation: ${translationId} to ${targetLanguage}`);
 
-    // Start translation asynchronously
-    translateDocumentComplete(
+    const jobData = {
       text,
-      html || processTextStructure(text).html,
-      structure || processTextStructure(text).structure,
-      targetLanguage,
+      html: html || processTextStructure(text).html,
+      structure: structure || processTextStructure(text).structure,
+      targetLang: targetLanguage,
+      fileName: fileName || 'document',
       translationId,
-      fileName || 'document'
-    ).catch(error => {
-      console.error('Translation error:', error);
-    });
+    };
 
-    res.json({
+    // Add the job to the queue
+    const job = await translationQueue.add('translate-document', jobData);
+
+    console.log(`📥 Job ${job.id} added to the queue for translationId: ${translationId}`);
+
+    res.status(202).json({
       success: true,
+      jobId: job.id,
       translationId,
-      message: 'Document translation started with optimized parallel processing',
-      estimatedTime: '1-3 minutes (70% faster)',
-      optimizations: [
-        'Parallel batch processing',
-        'Smart caching system',
-        'Optimized chunking',
-        'Reduced API delays',
-        'Enhanced rate limiting'
-      ],
+      message: 'Document translation has been queued successfully.',
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('Translation start error:', error);
+    console.error('Translation queue error:', error);
     res.status(500).json({
       success: false,
-      message: error.message,
-      timestamp: new Date().toISOString(),
-      errorType: 'translation_start_error'
+      message: 'Failed to queue the translation job.',
+      errorType: 'queue_error'
     });
   }
 };
 
-export const getTranslationProgress = (req, res) => {
-  const { translationId } = req.params;
-  const progress = translationProgress.get(translationId);
+export const getTranslationProgress = async (req, res) => {
+  const { jobId } = req.params;
+  try {
+    const job = await translationQueue.getJob(jobId);
 
-  if (!progress) {
-    return res.status(404).json({
-      success: false,
-      message: 'Translation not found',
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Translation job not found',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const state = await job.getState();
+    const progressData = job.progress;
+
+    res.json({
+      success: true,
+      jobId: job.id,
+      state,
+      progress: progressData,
       timestamp: new Date().toISOString()
     });
+  } catch (error) {
+    console.error('Error fetching job progress:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
-
-  res.json({
-    success: true,
-    ...progress,
-    hasPdf: !!progress.pdfBuffer,
-    timestamp: new Date().toISOString()
-  });
 };
 
-export const downloadTranslatedPdf = (req, res) => {
+export const downloadTranslatedPdf = async (req, res) => {
   const { translationId } = req.params;
-  const progress = translationProgress.get(translationId);
-
-  if (!progress?.completed || !progress?.pdfBuffer) {
-    return res.status(400).json({
-      success: false,
-      message: 'PDF not ready. Translation may still be in progress.',
-      timestamp: new Date().toISOString()
-    });
-  }
+  const redisKey = `translation:pdf:${translationId}`;
 
   try {
-    const pdfBuffer = Buffer.from(progress.pdfBuffer, 'base64');
+    const pdfBase64 = await connection.get(redisKey);
+
+    if (!pdfBase64) {
+      return res.status(404).json({
+        success: false,
+        message: 'Translated PDF not found. It may have expired or the translation is not complete.',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const pdfBuffer = Buffer.from(pdfBase64, 'base64');
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Length', pdfBuffer.length);
     res.setHeader('Content-Disposition', `attachment; filename="translated_${translationId}.pdf"`);
-    res.setHeader('Cache-Control', 'no-cache');
 
-    console.log(`PDF downloaded: ${translationId} (${pdfBuffer.length} bytes)`);
+    console.log(`📄 PDF downloaded: ${translationId} (${pdfBuffer.length} bytes)`);
     res.send(pdfBuffer);
 
   } catch (error) {
     console.error('PDF download error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error downloading PDF',
+      message: 'Error retrieving PDF from storage.',
       timestamp: new Date().toISOString()
     });
   }
 };
 
-export const cleanupTranslation = (req, res) => {
-  const { translationId } = req.params;
+export const cleanupTranslation = async (req, res) => {
+  const { translationId, jobId } = req.params;
 
-  if (translationProgress.has(translationId)) {
-    translationProgress.delete(translationId);
-    console.log(`Cleaned up translation: ${translationId}`);
+  try {
+    // Clean up the PDF from Redis
+    const redisKey = `translation:pdf:${translationId}`;
+    await connection.del(redisKey);
+
+    // Clean up the job from BullMQ
+    if (jobId) {
+      const job = await translationQueue.getJob(jobId);
+      if (job) {
+        await job.remove();
+      }
+    }
+
+    console.log(`🧹 Cleaned up resources for translation: ${translationId}`);
     res.json({
       success: true,
-      message: 'Translation data cleaned up',
+      message: 'Translation resources cleaned up successfully.',
       timestamp: new Date().toISOString()
     });
-  } else {
-    res.status(404).json({
-      success: false,
-      message: 'Translation not found',
-      timestamp: new Date().toISOString()
-    });
+  } catch (error) {
+    console.error('Cleanup error:', error);
+    res.status(500).json({ success: false, message: 'Error during cleanup.' });
   }
 };
 
