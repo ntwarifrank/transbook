@@ -26,7 +26,6 @@ const Footer = () => {
       'Video Editing'
     ],
     resources: [
-      'Enterprise',
       'AI Dubbing API'
     ],
     tools: [

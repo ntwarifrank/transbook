@@ -107,28 +107,6 @@ const PricingPlans = ({ userEmail }) => {
       popular: false,
       pricePerWord: "$0.000149/word"
     },
-    {
-      name: "ENTERPRISE",
-      price: "Custom",
-      period: "contact us",
-      wordLimit: "Unlimited words",
-      features: [
-        "All BUSINESS features included",
-        "Unlimited translations",
-        "Professional human translators",
-        "200+ languages including dialects",
-        "Real-time translation (1-2hrs)",
-        "Custom domain integration",
-        "On-premise deployment option",
-        "Advanced security & compliance",
-        "Custom workflow automation",
-        "24/7 dedicated support"
-      ],
-      buttonText: "CONTACT SALES",
-      buttonStyle: "bg-gradient-to-r from-purple-600 to-indigo-700 text-white hover:from-purple-700 hover:to-indigo-800 border-0",
-      popular: false,
-      pricePerWord: "Volume pricing"
-    }
   ];
 
   const handlePlanClick = async (plan) => {
@@ -145,11 +123,6 @@ const PricingPlans = ({ userEmail }) => {
       return;
     }
 
-    // Handle ENTERPRISE plan
-    if (plan.name === 'ENTERPRISE') {
-      window.open('mailto:ntwarifrank@lexineva.com?subject=Enterprise Plan Inquiry', '_blank');
-      return;
-    }
 
     // Check if user is signed in for paid plans
     if (!isSignedIn) {
@@ -211,7 +184,7 @@ const PricingPlans = ({ userEmail }) => {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {pricingPlans.map((plan, index) => (
           <div
             key={index}

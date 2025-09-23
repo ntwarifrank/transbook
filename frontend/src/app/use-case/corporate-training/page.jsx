@@ -81,16 +81,9 @@ const CorporatePage = () => {
     {
       icon: <Shield className="w-12 h-12" />,
       title: "Compliance & Security",
-      description: "Meet regulatory requirements across different markets with accurate legal and compliance translations, backed by enterprise-grade security.",
-      features: ["SOC2 compliance", "GDPR adherence", "Industry regulations", "Audit trails"],
+      description: "Meet regulatory requirements across different markets with accurate legal and compliance translations.",
+      features: ["GDPR adherence", "Industry regulations", "Audit trails"],
       color: "green"
-    },
-    {
-      icon: <Building2 className="w-12 h-12" />,
-      title: "Enterprise Infrastructure",
-      description: "Bank-grade security with dedicated enterprise support, SSO integration, and scalable infrastructure for global organizations.",
-      features: ["SSO integration", "API access", "White-label options", "Dedicated support"],
-      color: "purple"
     },
     {
       icon: <BarChart3 className="w-12 h-12" />,
@@ -173,18 +166,14 @@ const CorporatePage = () => {
                 <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl">
                   <Building2 className="w-8 h-8 text-white" />
                 </div>
-                <span className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-semibold">Enterprise Solutions</span>
               </div>
               <h1 className="text-5xl font-bold text-gray-900 mb-6 leading-tight">
                 Unify Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-600">Global Workforce</span>
               </h1>
               <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                Ensure consistent training and communication across all international teams with enterprise-grade translation solutions.
+                Ensure consistent training and communication across all international teams with translation solutions.
               </p>
               <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-                <button className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-8 py-4 rounded-xl font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all flex items-center justify-center shadow-lg">
-                  Request Enterprise Demo <ArrowRight className="w-5 h-5 ml-2" />
-                </button>
                 <button className="border border-gray-300 text-gray-700 px-8 py-4 rounded-xl font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center">
                   <Play className="w-5 h-5 mr-2" /> Watch Overview
                 </button>
@@ -276,9 +265,9 @@ const CorporatePage = () => {
       <div className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Why Enterprises Choose Lexivana</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Why Choose Lexivana</h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Enterprise-grade solutions built for global organizations
+              Solutions built for global organizations
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -338,7 +327,7 @@ const CorporatePage = () => {
       <div className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Enterprise Success Stories</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Success Stories</h2>
             <p className="text-xl text-gray-600">See how global organizations transform with Lexivana</p>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -386,68 +375,14 @@ const CorporatePage = () => {
         </div>
       </div>
 
-      {/* Enterprise Features */}
-      <div className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Enterprise-Grade Features</h2>
-            <p className="text-xl text-gray-600">Built for scale, security, and global operations</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[
-              { icon: <Shield className="w-6 h-6" />, title: "SOC2 Compliance", description: "Enterprise-grade security with full audit trails" },
-              { icon: <Lock className="w-6 h-6" />, title: "SSO Integration", description: "Seamless integration with your existing identity systems" },
-              { icon: <Settings className="w-6 h-6" />, title: "API Access", description: "Full API access for custom integrations and workflows" },
-              { icon: <Users className="w-6 h-6" />, title: "Team Management", description: "Advanced user roles and permission management" },
-              { icon: <BarChart3 className="w-6 h-6" />, title: "Analytics Dashboard", description: "Comprehensive reporting and usage analytics" },
-              { icon: <Zap className="w-6 h-6" />, title: "Priority Support", description: "24/7 dedicated support with SLA guarantees" }
-            ].map((feature, index) => (
-              <div key={index} className="p-6 border border-gray-200 rounded-xl hover:shadow-lg transition-shadow">
-                <div className="text-blue-500 mb-4">{feature.icon}</div>
-                <h3 className="font-semibold text-gray-900 mb-2">{feature.title}</h3>
-                <p className="text-gray-600 text-sm">{feature.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Testimonial */}
-      <div className="py-20 bg-blue-50">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <div className="flex justify-center mb-6">
-            {[...Array(5)].map((_, i) => (
-              <Star key={i} className="w-6 h-6 text-yellow-400 fill-current" />
-            ))}
-          </div>
-          <blockquote className="text-2xl font-medium text-gray-900 mb-8 leading-relaxed">
-            "Lexivana enables us to maintain consistent training quality across 40 countries. Our global onboarding is now seamless, and we've reduced training deployment time by 80% while improving compliance scores."
-          </blockquote>
-          <div className="flex items-center justify-center space-x-4">
-            <img 
-              src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face" 
-              alt="James Liu" 
-              className="w-16 h-16 rounded-full"
-            />
-            <div className="text-left">
-              <div className="font-semibold text-gray-900">James Liu</div>
-              <div className="text-gray-600">VP of Global Operations, MegaCorp</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* CTA Section */}
       <div className="py-20 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700">
         <div className="max-w-4xl mx-auto px-6 text-center">
           <h2 className="text-4xl font-bold text-white mb-6">Ready to Scale Globally?</h2>
           <p className="text-xl text-blue-100 mb-8">
-            Join thousands of enterprises transforming their global operations with Lexivana
+            Join thousands of organizations transforming their global operations with Lexivana
           </p>
           <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-            <button className="bg-white text-blue-600 px-8 py-4 rounded-xl font-semibold hover:bg-gray-100 transition-colors">
-              Request Enterprise Demo
-            </button>
             <button className="border border-white text-white px-8 py-4 rounded-xl font-semibold hover:bg-white hover:text-blue-600 transition-colors">
               Contact Sales Team
             </button>

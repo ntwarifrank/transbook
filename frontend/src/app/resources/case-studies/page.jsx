@@ -12,7 +12,6 @@ const CaseStudiesPage = () => {
     { id: 'all', name: 'All Industries' },
     { id: 'publishing', name: 'Publishing' },
     { id: 'education', name: 'Education' },
-    { id: 'enterprise', name: 'Enterprise' },
     { id: 'entertainment', name: 'Entertainment' }
   ];
 
@@ -56,26 +55,6 @@ const CaseStudiesPage = () => {
       author: 'Dr. Michael Rodriguez',
       authorTitle: 'Director of Digital Learning',
       tags: ['Education', 'Accessibility', 'Voice Generation']
-    },
-    {
-      id: 3,
-      title: 'Tech Company Localizes Documentation for Global Teams',
-      company: 'InnovateTech Solutions',
-      industry: 'enterprise',
-      challenge: 'Complex technical documentation in English only',
-      solution: 'AI translation with technical terminology preservation',
-      results: {
-        documentsTranslated: '10,000+',
-        developmentTime: '40% faster',
-        teamProductivity: '60% increase',
-        maintenanceCost: '70% reduction'
-      },
-      description: 'InnovateTech Solutions streamlined their global development process by translating all technical documentation into 15 languages with perfect technical accuracy.',
-      image: '/api/placeholder/400/250',
-      testimonial: '"Our global development teams now work seamlessly together. The technical accuracy of translations is remarkable - even complex API documentation is perfectly translated."',
-      author: 'Lisa Park',
-      authorTitle: 'Chief Technology Officer',
-      tags: ['Enterprise', 'Technical Documentation', 'Global Teams']
     },
     {
       id: 4,

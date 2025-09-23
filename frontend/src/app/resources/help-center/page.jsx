@@ -98,7 +98,7 @@ const HelpCenter = () => {
     },
     {
       question: 'Is my data secure and private?',
-      answer: 'Absolutely. We use enterprise-grade encryption and comply with GDPR, CCPA, and SOC 2 standards. Your content is automatically deleted after 30 days unless you choose to save it.',
+      answer: 'Absolutely. We use strong encryption and comply with GDPR, CCPA, and SOC 2 standards. Your content is automatically deleted after 30 days unless you choose to save it.',
       category: 'account'
     },
     {

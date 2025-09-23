@@ -202,28 +202,14 @@ const DocumentationPage = () => {
               'Up to 100,000 words per month',
               'All 130+ languages',
               'Premium translation quality',
-              'Audio generation',
-              'Priority support',
-              'API access'
-            ]
-          },
-          {
-            name: 'Enterprise',
-            price: 'Custom',
-            features: [
-              'Unlimited words',
-              'Custom voice cloning',
-              'Dedicated account manager',
-              'Custom integrations',
-              'SLA guarantees',
-              'White-label options'
-            ]
-          }
-        ]
-      }
     }
-  ];
+  }
+];
 
+const filteredSections = sections.filter(section =>
+  section.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  section.content.title.toLowerCase().includes(searchTerm.toLowerCase())
+);
   const filteredSections = sections.filter(section =>
     section.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     section.content.title.toLowerCase().includes(searchTerm.toLowerCase())
