@@ -177,7 +177,7 @@ const PaddlePayment = ({
 
               {/* Features Preview */}
               <div className="mb-8">
-                <h4 className="font-bold text-gray-900 mb-2 text-lg">What's included:</h4>
+                <h4 className="font-bold text-gray-900 mb-2 text-lg">What&apos;s included:</h4>
                 <div className="space-y-3">
                   {planData?.features?.slice(0, 3).map((feature, index) => (
                     <div key={index} className="flex items-start space-x-2">

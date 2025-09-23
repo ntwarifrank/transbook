@@ -6,6 +6,7 @@ import WhyChoose from "../components/WhyChoose"
 import MarketingTranslatorComponent from "../components/whoUse"
 import TranslationAdvantages from "../components/keyAdvantages"
 import Footer from "../components/footer"
+import ChatBot from "../components/ChatBot"
 export default function Home() {
 
   return (
@@ -17,6 +18,7 @@ export default function Home() {
       <MarketingTranslatorComponent />
       <TranslationAdvantages />
       <Footer />
+      <ChatBot />
     </div>
   );
 }

@@ -1,11 +1,15 @@
 "use client"
 import React, { useState, useEffect } from 'react';
 import { Check, Star, Zap } from 'lucide-react';
-import { initializePaddle, Paddle } from '@paddle/paddle-js';
+import { initializePaddle } from '@paddle/paddle-js';
+import { useUser } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
 
 const PricingPlans = ({ userEmail }) => {
   const [paddle, setPaddle] = useState();
+  const { user, isSignedIn } = useUser();
+  const router = useRouter();
 
   useEffect(() => {
     // Initialize Paddle
@@ -128,36 +132,66 @@ const PricingPlans = ({ userEmail }) => {
   ];
 
   const handlePlanClick = async (plan) => {
+    // Handle FREE plan
+    if (plan.name === 'FREE') {
+      if (!isSignedIn) {
+        // Redirect to sign-up for free plan
+        router.push('/sign-up?plan=free');
+        return;
+      }
+      // User is signed in and wants free plan - could redirect to dashboard
+      alert('You already have access to the free plan! Start translating now.');
+      router.push('/');
+      return;
+    }
+
+    // Handle ENTERPRISE plan
     if (plan.name === 'ENTERPRISE') {
       window.open('mailto:ntwarifrank@lexineva.com?subject=Enterprise Plan Inquiry', '_blank');
       return;
     }
 
+    // Check if user is signed in for paid plans
+    if (!isSignedIn) {
+      // Redirect to sign-up with plan information
+      router.push(`/sign-up?plan=${plan.name.toLowerCase()}&price=${plan.price}`);
+      return;
+    }
+
+    // User is signed in, proceed with payment
     if (!paddle) {
       console.error('Paddle is not initialized yet.');
-      // Optionally, show a message to the user
+      alert('Payment system is loading. Please try again in a moment.');
       return;
     }
 
     try {
-      // 1. Create a checkout session on your backend
-      const response = await axios.post('http://localhost:5000/api/paddle/create-checkout', {
+      // Use the existing paddle API endpoint
+      const response = await axios.post('/api/paddle', {
+        amount: parseFloat(plan.price.replace('$', '')),
+        currency: 'USD',
+        description: `${plan.name} Plan - ${plan.wordLimit}`,
         planName: plan.name,
-        userEmail: userEmail, // Make sure you have the user's email
-        customData: { 
-          // You can pass any custom data here
-          userId: 'user-id-if-available',
-        },
+        userEmail: user?.emailAddresses?.[0]?.emailAddress || userEmail,
+        userId: user?.id,
       });
 
-      const { checkoutData } = response.data;
-
-      // 2. Open the Paddle checkout overlay
-      paddle.Checkout.open(checkoutData);
+      if (response.data.success) {
+        // Redirect to Paddle checkout
+        window.location.href = response.data.checkoutUrl;
+      } else {
+        throw new Error(response.data.message || 'Failed to create checkout session');
+      }
 
     } catch (error) {
       console.error('Error creating checkout session:', error);
-      // Optionally, show an error message to the user
+      
+      // Show user-friendly error message
+      if (error.response?.status === 500) {
+        alert('Payment system is temporarily unavailable. Please try again later or contact support.');
+      } else {
+        alert('Unable to process payment. Please check your connection and try again.');
+      }
     }
   };
 
@@ -230,7 +264,10 @@ const PricingPlans = ({ userEmail }) => {
                 onClick={() => handlePlanClick(plan)}
                 className={`w-full py-3 px-4 rounded-lg font-semibold text-sm transition-all duration-200 transform hover:scale-105 ${plan.buttonStyle}`}
               >
-                {plan.buttonText}
+                {!isSignedIn && plan.name !== 'FREE' && plan.name !== 'ENTERPRISE' 
+                  ? `SIGN UP & ${plan.buttonText}` 
+                  : plan.buttonText
+                }
               </button>
             </div>
           </div>
@@ -255,7 +292,7 @@ const PricingPlans = ({ userEmail }) => {
             </div>
             <div className="bg-purple-50 p-4 rounded-lg">
               <div className="font-semibold text-purple-800">24/7 Support</div>
-              <div className="text-purple-600">We're here to help</div>
+              <div className="text-purple-600">We&apos;re here to help</div>
             </div>
           </div>
         </div>

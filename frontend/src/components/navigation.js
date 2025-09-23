@@ -1,6 +1,6 @@
 "use client"
-import { useState, useEffect } from 'react';
-import { ChevronDown, Menu, X, LogOut, User, Settings } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
@@ -63,9 +63,6 @@ const Navigation = () => {
     setActiveDropdown(null);
   };
 
-  const getUserInitial = (username) => {
-    return username ? username.charAt(0).toUpperCase() : 'U';
-  };
 
   return (
     <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">

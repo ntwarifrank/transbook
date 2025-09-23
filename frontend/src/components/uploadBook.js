@@ -6,14 +6,13 @@ import PricingModal from './PricingModal';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFile, faTrash, faCheck, faSpinner, faDownload, faExclamationTriangle, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import { faChevronDown } from '@fortawesome/free-solid-svg-icons';
-import { Upload, FileText, Book, AlertCircle, RefreshCw } from 'lucide-react';
+import { Upload, FileText, Book, AlertCircle, RefreshCw, Zap } from 'lucide-react';
 import Flag from 'react-world-flags';
 
 const BookTranslationUpload = () => {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [uploadError, setUploadError] = useState(null);
   const [selectedLanguage, setSelectedLanguage] = useState('');
-  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showToneDropdown, setShowToneDropdown] = useState(false);
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
   const [selectedTone, setSelectedTone] = useState('Professional');
@@ -23,22 +22,79 @@ const BookTranslationUpload = () => {
   const [translationProgress, setTranslationProgress] = useState(0);
   const [translationStage, setTranslationStage] = useState('');
   const [translationId, setTranslationId] = useState(null);
-  const [extractionId, setExtractionId] = useState(null);
   const [translationResult, setTranslationResult] = useState(null);
   const [extractedContent, setExtractedContent] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
   const [networkStatus, setNetworkStatus] = useState('online');
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [translationCost, setTranslationCost] = useState(0);
-  const [pendingTranslation, setPendingTranslation] = useState(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const fileInputRef = useRef(null);
   const progressIntervalRef = useRef(null);
   const extractionIntervalRef = useRef(null);
   const router = useRouter();
   const { user, isSignedIn } = useUser();
+  const [userCredits, setUserCredits] = useState(0);
+  
+  // Free credits for new users and monthly refresh
+  const MONTHLY_FREE_CREDITS = 5000;
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  // Function to check if user needs monthly credit refresh
+  const checkAndRefreshMonthlyCredits = async (userData) => {
+    if (!userData) return;
 
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    // Get user's metadata
+    const lastRefreshDate = userData.publicMetadata?.lastCreditRefresh;
+    const userPlan = userData.publicMetadata?.plan || 'free';
+    
+    // Only refresh for users without paid plans
+    if (userPlan !== 'free') return;
+    
+    let needsRefresh = false;
+    
+    if (!lastRefreshDate) {
+      // First time user - give initial credits
+      needsRefresh = true;
+    } else {
+      // Check if it's a new month
+      const lastRefresh = new Date(lastRefreshDate);
+      const lastRefreshMonth = lastRefresh.getMonth();
+      const lastRefreshYear = lastRefresh.getFullYear();
+      
+      if (currentYear > lastRefreshYear || 
+          (currentYear === lastRefreshYear && currentMonth > lastRefreshMonth)) {
+        needsRefresh = true;
+      }
+    }
+    
+    if (needsRefresh) {
+      try {
+        // Update user metadata with new credits and refresh date
+        await fetch('/api/user/refresh-credits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: userData.id,
+            newCredits: MONTHLY_FREE_CREDITS,
+            refreshDate: now.toISOString()
+          })
+        });
+        
+        // Update local state
+        setUserCredits(MONTHLY_FREE_CREDITS);
+        
+        console.log(`✅ Monthly credits refreshed: ${MONTHLY_FREE_CREDITS} credits`);
+      } catch (error) {
+        console.error('Failed to refresh monthly credits:', error);
+      }
+    }
+  };
+
+  
   const languages = [
     { code: 'en', name: 'English', flag: 'GB' },
     { code: 'de', name: 'German', flag: 'DE' },
@@ -84,7 +140,39 @@ const BookTranslationUpload = () => {
       handleTranslate(); // This will now proceed as a signed-in user
       localStorage.removeItem('pendingTranslation');
     }
-  }, [isSignedIn]);
+  }, [isSignedIn, handleTranslate, languages]);
+
+  useEffect(() => {
+    const handleUserCredits = async () => {
+      if (!user) return;
+      
+      // Check for monthly credit refresh first
+      await checkAndRefreshMonthlyCredits(user);
+      
+      // Then set credits from metadata
+      if (user.publicMetadata && typeof user.publicMetadata.credits === 'number') {
+        setUserCredits(user.publicMetadata.credits);
+      } else {
+        // New user - give them initial free credits
+        setUserCredits(MONTHLY_FREE_CREDITS); // Give them the full monthly amount
+      }
+    };
+    
+    handleUserCredits();
+  }, [user]);
+
+  // Cleanup intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+      const intervalId = extractionIntervalRef.current;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, []);
 
   // Check network connectivity
   useEffect(() => {
@@ -144,74 +232,41 @@ const BookTranslationUpload = () => {
   };
 
   // Enhanced polling with better error handling
-  const pollExtractionProgress = async (extractionId) => {
+  
+  const pollTranslationProgress = async (jobId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/extraction-progress/${extractionId}`);
+      const response = await fetch(`/api/translation/progress/${jobId}`);
       const data = await response.json();
-      
       if (data.success) {
-        setTranslationProgress(data.progress || 0);
-        setTranslationStage(data.stage || 'Processing...');
+        const progress = data.progress || {};
+        setTranslationProgress(progress.progress || 0);
+        setTranslationStage(progress.stage || 'Processing...');
         
-        if (data.completed && data.extractedContent) {
-          setExtractedContent(data.extractedContent);
-          setUploadedFile(prev => ({
-            ...prev,
-            extractedContent: data.extractedContent,
-            uploaded: true
-          }));
-          clearInterval(extractionIntervalRef.current);
-          return true;
-        }
-        
-        if (data.failed) {
-          const { errorMessage, suggestions } = handleApiError(new Error(data.error), 'PDF extraction');
-          setUploadError({ message: errorMessage, suggestions });
-          clearInterval(extractionIntervalRef.current);
-          return true;
-        }
-      }
-      return false;
-    } catch (error) {
-      const { errorMessage, suggestions } = handleApiError(error, 'Progress check');
-      setUploadError({ message: errorMessage, suggestions });
-      return false;
-    }
-  };
-
-  const pollTranslationProgress = async (translationId) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/translation-progress/${translationId}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setTranslationProgress(data.progress || 0);
-        setTranslationStage(data.stage || 'Processing...');
-        
-        if (data.completed) {
-          setTranslationResult(data.result);
+        if (data.state === 'completed' && progress.completed) {
+          // Translation completed successfully
+          setTranslationResult(progress.translatedText || 'Translation completed');
           setIsTranslating(false);
           clearInterval(progressIntervalRef.current);
-          return true;
-        }
-        
-        if (data.failed) {
-          const { errorMessage, suggestions, canRetry } = handleApiError(new Error(data.error), 'Translation');
-          setUploadError({ message: errorMessage, suggestions, canRetry });
+          
+          // Show success notification
+          console.log('✅ Translation completed successfully!');
+        } else if (data.state === 'failed' || progress.failed) {
+          const errorMsg = progress.error || data.error || 'Translation failed';
+          const { errorMessage, suggestions } = handleApiError(new Error(errorMsg), 'Translation');
+          setUploadError({ message: errorMessage, suggestions, canRetry: true });
           setIsTranslating(false);
           clearInterval(progressIntervalRef.current);
-          return true;
         }
       }
-      return false;
     } catch (error) {
-      const { errorMessage, suggestions, canRetry } = handleApiError(error, 'Translation progress');
-      if (retryCount < 3 && canRetry) {
-        setRetryCount(prev => prev + 1);
-        // Continue polling
-        return false;
+      console.error('Progress polling error:', error);
+      setRetryCount(prev => prev + 1);
+      if (retryCount < 3) {
+        // Continue polling with exponential backoff
+        setTimeout(() => pollTranslationProgress(jobId), Math.min(5000 * Math.pow(2, retryCount), 30000));
       } else {
-        setUploadError({ message: errorMessage, suggestions, canRetry });
+        const { errorMessage, suggestions } = handleApiError(error, 'Translation progress');
+        setUploadError({ message: errorMessage, suggestions, canRetry: true });
         setIsTranslating(false);
         clearInterval(progressIntervalRef.current);
         return true;
@@ -263,41 +318,24 @@ const BookTranslationUpload = () => {
       formData.append('file', file);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
-
-      const response = await fetch(`${API_BASE_URL}/api/upload-document`, {
-        method: 'POST',
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+      
+      const response = await fetch('/api/upload', { 
+        method: 'POST', 
         body: formData,
         signal: controller.signal
       });
-
+      
       clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP ${response.status}`);
-      }
-
       const data = await response.json();
       
-      if (data.success) {
+      if (response.ok && data.success) {
+        // Handle different response types based on file processing
         if (data.requiresProgress && data.extractionId) {
-          // PDF processing - start polling
-          setExtractionId(data.extractionId);
-          setUploadedFile({
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            id: data.documentId,
-            uploaded: false
-          });
-          
-          extractionIntervalRef.current = setInterval(() => {
-            pollExtractionProgress(data.extractionId);
-          }, 2000);
-          
-        } else {
-          // Direct processing complete
+          // For PDFs that require background processing
+          pollExtractionProgress(data.extractionId);
+        } else if (data.extractedContent) {
+          // For files processed immediately
           setExtractedContent(data.extractedContent);
           setUploadedFile({
             name: file.name,
@@ -305,24 +343,58 @@ const BookTranslationUpload = () => {
             type: file.type,
             id: data.documentId,
             extractedContent: data.extractedContent,
-            uploaded: true
+            uploaded: true,
           });
         }
       } else {
         throw new Error(data.message || 'Upload failed');
       }
-
     } catch (error) {
       if (error.name === 'AbortError') {
-        setUploadError({
-          message: 'Upload timeout - file too large or connection too slow',
-          suggestions: ['Try a smaller file', 'Check your internet connection']
+        setUploadError({ 
+          message: 'Upload timeout - file too large or connection too slow', 
+          suggestions: ['Try a smaller file', 'Check your internet connection'],
+          canRetry: true 
         });
       } else {
         const { errorMessage, suggestions, canRetry } = handleApiError(error, 'Upload');
         setUploadError({ message: errorMessage, suggestions, canRetry });
       }
     } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Add extraction progress polling for PDFs
+  const pollExtractionProgress = async (extractionId) => {
+    try {
+      const response = await fetch(`/api/extraction/progress/${extractionId}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setTranslationProgress(data.progress || 0);
+        setTranslationStage(data.stage || 'Extracting text...');
+        
+        if (data.completed && data.extractedContent) {
+          setExtractedContent(data.extractedContent);
+          setUploadedFile(prev => ({
+            ...prev,
+            extractedContent: data.extractedContent,
+            uploaded: true,
+          }));
+          setIsUploading(false);
+          setTranslationProgress(0);
+          setTranslationStage('');
+        } else if (data.failed) {
+          throw new Error(data.error || 'Text extraction failed');
+        } else {
+          // Continue polling
+          setTimeout(() => pollExtractionProgress(extractionId), 2000);
+        }
+      }
+    } catch (error) {
+      const { errorMessage, suggestions, canRetry } = handleApiError(error, 'Text extraction');
+      setUploadError({ message: errorMessage, suggestions, canRetry });
       setIsUploading(false);
     }
   };
@@ -361,8 +433,14 @@ const BookTranslationUpload = () => {
     setTranslationStage('');
     setTranslationResult(null);
     setRetryCount(0);
-    clearInterval(progressIntervalRef.current);
-    clearInterval(extractionIntervalRef.current);
+    
+    // Clear all intervals
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+    }
+    if (extractionIntervalRef.current) {
+      clearInterval(extractionIntervalRef.current);
+    }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -379,121 +457,185 @@ const BookTranslationUpload = () => {
   };
 
   const retryOperation = () => {
-    if (uploadError?.canRetry) {
-      if (!uploadedFile && fileInputRef.current?.files[0]) {
-        handleFileUpload(fileInputRef.current.files[0]);
-      } else if (uploadedFile && selectedLanguage) {
-        handleTranslate();
-      }
-      setUploadError(null);
+    if (!uploadError?.canRetry) return;
+    
+    setUploadError(null);
+    setRetryCount(prev => prev + 1);
+    
+    // Retry file upload if no file is uploaded yet
+    if (!uploadedFile && fileInputRef.current?.files[0]) {
+      handleFileUpload(fileInputRef.current.files[0]);
+    } 
+    // Retry translation if file is uploaded and language is selected
+    else if (uploadedFile?.extractedContent?.text && selectedLanguage) {
+      handleTranslate();
+    }
+    // If neither condition is met, reset retry count
+    else {
       setRetryCount(0);
     }
   };
 
-  const handleConfirmPayment = () => {
-    // Store translation details and redirect to sign up
-    const translationData = {
-      text: uploadedFile.extractedContent.text,
-      html: uploadedFile.extractedContent.html,
-      structure: uploadedFile.extractedContent.structure,
-      targetLanguage: selectedLanguage.code,
-      tone: selectedTone,
-      fileName: uploadedFile.name,
-    };
-    localStorage.setItem('pendingTranslation', JSON.stringify(translationData));
-    router.push('/sign-up');
+  const handleConfirmPayment = async () => {
+    setIsProcessingPayment(true);
+    
+    const wordCount = uploadedFile.extractedContent.metadata?.words || uploadedFile.extractedContent.text.split(/\s+/).length;
+    
+    if (!isSignedIn) {
+      // Save translation data and redirect to sign-up for non-signed users
+      const translationData = {
+        text: uploadedFile.extractedContent.text,
+        html: uploadedFile.extractedContent.html,
+        structure: uploadedFile.extractedContent.structure,
+        targetLanguage: selectedLanguage.code,
+        tone: selectedTone,
+        fileName: uploadedFile.name,
+        documentId: uploadedFile.id,
+      };
+      localStorage.setItem('pendingTranslation', JSON.stringify(translationData));
+      setIsProcessingPayment(false);
+      setShowPricingModal(false);
+      router.push('/sign-up');
+      return;
+    }
+
+    // For signed-in users
+    if (userCredits >= wordCount) {
+      // User has enough credits - proceed with translation directly
+      setIsTranslating(true);
+      setTranslationProgress(0);
+      setTranslationStage('Initializing translation...');
+      
+      try {
+        console.log('🚀 Starting translation with credits:', {
+          wordCount,
+          userCredits,
+          targetLanguage: selectedLanguage.code
+        });
+
+        const response = await fetch('/api/translation/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: uploadedFile.extractedContent.text,
+            html: uploadedFile.extractedContent.html || '',
+            structure: uploadedFile.extractedContent.structure || [],
+            targetLanguage: selectedLanguage.code,
+            fileName: uploadedFile.name || 'document.txt'
+          }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          setTranslationId(data.translationId);
+          console.log('✅ Translation job queued:', data.jobId);
+          
+          // Start polling for progress using jobId
+          progressIntervalRef.current = setInterval(() => {
+            pollTranslationProgress(data.jobId);
+          }, 3000);
+          
+          setIsProcessingPayment(false);
+          setShowPricingModal(false);
+          
+        } else {
+          throw new Error(data.message || 'Failed to start translation');
+        }
+      } catch (error) {
+        console.error('❌ Translation start error:', error);
+        const { errorMessage, suggestions, canRetry } = handleApiError(error, 'Translation');
+        setUploadError({ message: errorMessage, suggestions, canRetry });
+        setIsTranslating(false);
+        setIsProcessingPayment(false);
+      }
+    } else {
+      // User doesn't have enough credits - redirect to purchase more
+      try {
+        const response = await fetch('/api/paddle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: (wordCount - userCredits) * 0.005, // Cost for additional credits needed
+            currency: 'USD',
+            description: `Additional credits for translation of ${uploadedFile.name}`,
+            documentId: uploadedFile.id,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          setIsProcessingPayment(false);
+          setShowPricingModal(false);
+          window.location.href = data.checkoutUrl;
+        } else {
+          throw new Error(data.message || 'Failed to create checkout session');
+        }
+      } catch (error) {
+        const { errorMessage, suggestions } = handleApiError(error, 'Payment');
+        setUploadError({ message: errorMessage, suggestions });
+        setIsProcessingPayment(false);
+      }
+    }
   };
 
   const handleTranslate = async () => {
-    // Safeguard to ensure content and metadata are ready
-    if (!uploadedFile?.extractedContent?.metadata?.words) {
-      setUploadError({
-        message: 'File analysis is not yet complete.',
-        suggestions: ['Please wait for the document processing to finish before starting the translation.'],
-      });
-      return;
-    }
-        if (!isSignedIn) {
-      const wordCount = uploadedFile.extractedContent.metadata.words;
-      const cost = wordCount * 0.005;
-      setTranslationCost(cost);
-      setShowPricingModal(true);
-      return;
-    }
-
+    // Reset states
+    setUploadError(null);
+    setRetryCount(0);
+    
+    // Perform all validations first
     if (!uploadedFile?.extractedContent?.text) {
-      setUploadError({
-        message: 'No text content available',
-        suggestions: ['Upload a file with readable text content']
-      });
+      setUploadError({ message: 'No text content available for translation' });
       return;
     }
     if (!selectedLanguage) {
-      setUploadError({
-        message: 'No target language selected',
-        suggestions: ['Please select a target language']
-      });
+      setUploadError({ message: 'Please select a target language' });
       return;
     }
-
     if (!navigator.onLine) {
-      setUploadError({
-        message: 'No internet connection',
-        suggestions: ['Check your internet connection']
-      });
+      setUploadError({ message: 'No internet connection available' });
       return;
     }
 
-    setIsTranslating(true);
-    setTranslationProgress(0);
-    setTranslationStage('Starting translation...');
-    setUploadError(null);
-    setTranslationResult(null);
-    setRetryCount(0);
+    const wordCount = uploadedFile.extractedContent.metadata?.words || uploadedFile.extractedContent.text.split(/\s+/).length;
+    const costInDollars = wordCount * 0.005;
 
+    // Always show pricing modal for confirmation
+    // This allows users to see the cost/credit usage before proceeding
+    setTranslationCost(costInDollars);
+    setShowPricingModal(true);
+  };
+
+
+  // Add copy to clipboard function
+  const copyToClipboard = async () => {
+    if (!translationResult) return;
+    
     try {
-      const response = await fetch(`${API_BASE_URL}/api/translate-document-complete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: uploadedFile.extractedContent.text,
-          html: uploadedFile.extractedContent.html,
-          structure: uploadedFile.extractedContent.structure,
-          targetLanguage: selectedLanguage.code,
-          tone: selectedTone,
-          fileName: uploadedFile.name
-        })
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        setTranslationId(data.translationId);
-        
-        // Start polling for progress
-        progressIntervalRef.current = setInterval(() => {
-          pollTranslationProgress(data.translationId);
-        }, 2000);
-        
-      } else {
-        throw new Error(data.message || 'Translation failed to start');
-      }
-      
+      await navigator.clipboard.writeText(translationResult);
+      // You could add a toast notification here
+      console.log('✅ Translation copied to clipboard');
     } catch (error) {
-      const { errorMessage, suggestions, canRetry } = handleApiError(error, 'Translation');
-      setUploadError({ message: errorMessage, suggestions, canRetry });
-      setIsTranslating(false);
+      console.error('Failed to copy to clipboard:', error);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = translationResult;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
     }
   };
 
   const downloadTranslation = async (format = 'txt') => {
-    if (!translationId) return;
+    if (!translationResult && !translationId) return;
     
     try {
-      if (format === 'pdf') {
-        const response = await fetch(`${API_BASE_URL}/api/download-pdf/${translationId}`);
+      if (format === 'pdf' && translationId) {
+        // Download PDF from backend
+        const response = await fetch(`/api/translation/download/${translationId}`);
         if (response.ok) {
           const blob = await response.blob();
           const url = window.URL.createObjectURL(blob);
@@ -504,20 +646,24 @@ const BookTranslationUpload = () => {
           a.click();
           document.body.removeChild(a);
           window.URL.revokeObjectURL(url);
+          console.log('✅ PDF downloaded successfully');
           return;
         }
       }
       
-      // Fallback to text download
-      const blob = new Blob([translationResult], { type: 'text/plain;charset=utf-8' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `translated_${uploadedFile.name.replace(/\.[^/.]+$/, '')}_${selectedLanguage.code}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      // Text download
+      if (translationResult) {
+        const blob = new Blob([translationResult], { type: 'text/plain;charset=utf-8' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `translated_${uploadedFile.name.replace(/\.[^/.]+$/, '')}_${selectedLanguage.code}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        console.log('✅ Text file downloaded successfully');
+      }
       
     } catch (error) {
       console.error('Download error:', error);
@@ -526,24 +672,6 @@ const BookTranslationUpload = () => {
     }
   };
 
-  const copyToClipboard = async () => {
-    if (!translationResult) return;
-    
-    try {
-      await navigator.clipboard.writeText(translationResult);
-      // You could add a toast notification here
-      console.log('Text copied to clipboard');
-    } catch (err) {
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea');
-      textArea.value = translationResult;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      console.log('Text copied to clipboard (fallback)');
-    }
-  };
 
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes';
@@ -559,10 +687,7 @@ const BookTranslationUpload = () => {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
       }
-      if (extractionIntervalRef.current) {
-        clearInterval(extractionIntervalRef.current);
-      }
-    };
+          };
   }, []);
 
   return (
@@ -570,10 +695,17 @@ const BookTranslationUpload = () => {
       {/* Network status indicator */}
       {showPricingModal && (
         <PricingModal 
-          wordCount={uploadedFile.extractedContent.metadata.words}
+          wordCount={uploadedFile.extractedContent.metadata?.words || uploadedFile.extractedContent.text.split(/\s+/).length}
           cost={translationCost}
           onConfirm={handleConfirmPayment}
-          onCancel={() => setShowPricingModal(false)}
+          onCancel={() => {
+            setShowPricingModal(false);
+            setIsProcessingPayment(false);
+          }}
+          isSignedIn={isSignedIn}
+          userCredits={userCredits}
+          userPlan={user?.publicMetadata?.plan || 'free'}
+          isLoading={isProcessingPayment}
         />
       )}
 
@@ -610,6 +742,12 @@ const BookTranslationUpload = () => {
               }`}></div>
               {networkStatus === 'online' ? 'Online' : 'Offline'}
             </div>
+            {isSignedIn && (
+              <div className="flex items-center px-3 py-1 rounded-full bg-blue-100 text-blue-800">
+                <Zap size={14} className="mr-1" />
+                <span>{userCredits.toLocaleString()} Credits</span>
+              </div>
+            )}
             <div className="text-gray-500">
               Enhanced v2.0 with Rate Limiting
             </div>

@@ -149,7 +149,11 @@ const AuthForm = () => {
 
         setSuccessMessage(message || `${isSignUp ? 'Account created' : 'Login'} successful!`);
         
-        isSignUp ? setIsSignUp(false) : router.push("/")
+        if (isSignUp) {
+          setIsSignUp(false);
+        } else {
+          router.push("/");
+        }
         
         // Reset form on success
         setFormData({
@@ -255,7 +259,7 @@ const AuthForm = () => {
             {/* Logo */}
             <div className="mb-10">
               <div className="flex flex-row">
-                <Image src="/logo.png" width={40} height={40}></Image>
+                <Image src="/logo.png" alt="TransBook AI Logo" width={40} height={40} />
                 <div className="flex items-center">
                   <div className="bg-gradient-to-r bg-clip-text text-transparent from-blue-600 to-purple-600 pl-2 py-1 font-bold text-2xl rounded-xl">
                     lexi
@@ -429,7 +433,7 @@ const AuthForm = () => {
 
             {/* Terms */}
             <div className="mt-6 text-center text-sm text-gray-500 leading-relaxed">
-              By {isSignUp ? 'creating an account' : 'signing in'}, you agree to TransBook's{' '}
+              By {isSignUp ? 'creating an account' : 'signing in'}, you agree to TransBook&apos;s{' '}
               <a href="#" className="text-blue-600 hover:text-blue-700 hover:underline transition-colors">Privacy Policy</a>
               {' '}and{' '}
               <a href="#" className="text-blue-600 hover:text-blue-700 hover:underline transition-colors">Terms of Service</a>

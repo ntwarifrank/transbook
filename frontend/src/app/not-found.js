@@ -116,8 +116,8 @@ const Advanced404Page = () => {
               Oops! Page Not Found
             </h2>
             <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto leading-relaxed">
-              The page you're looking for seems to have vanished into the digital void. 
-              Don't worry, even the best explorers sometimes take a wrong turn.
+              The page you&apos;re looking for seems to have vanished into the digital void. 
+              Don&apos;t worry, even the best explorers sometimes take a wrong turn.
             </p>
             
             {/* Status Info */}
