@@ -1,27 +1,14 @@
 "use client"
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Check, Star, Zap } from 'lucide-react';
-import { initializePaddle } from '@paddle/paddle-js';
 import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
+import usePaddle from '../hooks/usePaddle'; // Import the new centralized hook
 
 const PricingPlans = ({ userEmail }) => {
-  const [paddle, setPaddle] = useState();
+  const { paddle, isLoading: isPaddleLoading, error: paddleError } = usePaddle(); // Use the hook
   const { user, isSignedIn } = useUser();
   const router = useRouter();
-
-  useEffect(() => {
-    // Initialize Paddle
-    initializePaddle({
-      environment: 'sandbox', // Use 'sandbox' for testing, 'production' for live
-      token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN, // Your client-side token
-    }).then((paddleInstance) => {
-      if (paddleInstance) {
-        setPaddle(paddleInstance);
-      }
-    });
-  }, []);
 
   const pricingPlans = [
     {
@@ -113,58 +100,58 @@ const PricingPlans = ({ userEmail }) => {
     // Handle FREE plan
     if (plan.name === 'FREE') {
       if (!isSignedIn) {
-        // Redirect to sign-up for free plan
         router.push('/sign-up?plan=free');
         return;
       }
-      // User is signed in and wants free plan - could redirect to dashboard
-      alert('You already have access to the free plan! Start translating now.');
-      router.push('/');
+      router.push('/'); // Already signed in, go to dashboard/home
       return;
     }
 
-
     // Check if user is signed in for paid plans
     if (!isSignedIn) {
-      // Redirect to sign-up with plan information
       router.push(`/sign-up?plan=${plan.name.toLowerCase()}&price=${plan.price}`);
       return;
     }
 
     // User is signed in, proceed with payment
-    if (!paddle) {
-      console.error('Paddle is not initialized yet.');
-      alert('Payment system is loading. Please try again in a moment.');
+    if (isPaddleLoading) {
+      console.log('Paddle is still loading. Please wait.');
+      return; // Button should be disabled, but this is a safeguard
+    }
+
+    if (paddleError || !paddle) {
+      console.error('Paddle is not available or failed to initialize.', paddleError);
+      // Silently fail or show a subtle error indicator, but no popup.
       return;
     }
 
     try {
-      // Use the existing paddle API endpoint
-      const response = await axios.post('/api/paddle', {
-        amount: parseFloat(plan.price.replace('$', '')),
-        currency: 'USD',
-        description: `${plan.name} Plan - ${plan.wordLimit}`,
-        planName: plan.name,
-        userEmail: user?.emailAddresses?.[0]?.emailAddress || userEmail,
-        userId: user?.id,
+      const planPriceIds = {
+        'BASIC': process.env.NEXT_PUBLIC_PADDLE_BASIC_PRICE_ID,
+        'PRO': process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID,
+        'BUSINESS': process.env.NEXT_PUBLIC_PADDLE_BUSINESS_PRICE_ID
+      };
+
+      const priceId = planPriceIds[plan.name];
+      
+      if (!priceId) {
+        throw new Error(`Price ID not found for plan: ${plan.name}`);
+      }
+
+      // Open checkout using the paddle instance from the hook
+      paddle.Checkout.open({
+        items: [{ priceId, quantity: 1 }],
+        customer: {
+          email: user?.emailAddresses?.[0]?.emailAddress || userEmail,
+        },
+        customData: {
+          userId: user?.id,
+          planName: plan.name,
+        },
       });
 
-      if (response.data.success) {
-        // Redirect to Paddle checkout
-        window.location.href = response.data.checkoutUrl;
-      } else {
-        throw new Error(response.data.message || 'Failed to create checkout session');
-      }
-
     } catch (error) {
-      console.error('Error creating checkout session:', error);
-      
-      // Show user-friendly error message
-      if (error.response?.status === 500) {
-        alert('Payment system is temporarily unavailable. Please try again later or contact support.');
-      } else {
-        alert('Unable to process payment. Please check your connection and try again.');
-      }
+      console.error('Error opening Paddle checkout:', error);
     }
   };
 
@@ -235,9 +222,13 @@ const PricingPlans = ({ userEmail }) => {
               
               <button
                 onClick={() => handlePlanClick(plan)}
-                className={`w-full py-3 px-4 rounded-lg font-semibold text-sm transition-all duration-200 transform hover:scale-105 ${plan.buttonStyle}`}
+                disabled={isPaddleLoading} // Disable button while Paddle is loading
+                className={`w-full py-3 px-4 rounded-lg font-semibold text-sm transition-all duration-200 transform hover:scale-105 ${plan.buttonStyle} ${
+                  isPaddleLoading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
-                {!isSignedIn && plan.name !== 'FREE' && plan.name !== 'ENTERPRISE' 
+                {isPaddleLoading && plan.name !== 'FREE' ? 'Loading...' : 
+                  !isSignedIn && plan.name !== 'FREE' && plan.name !== 'ENTERPRISE' 
                   ? `SIGN UP & ${plan.buttonText}` 
                   : plan.buttonText
                 }

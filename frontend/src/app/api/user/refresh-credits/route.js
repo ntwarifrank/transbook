@@ -1,20 +1,17 @@
 import { NextResponse } from 'next/server';
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { currentUser } from '@clerk/nextjs/server';
+import { clerkClient } from '@clerk/clerk-sdk-node';
 
 export async function POST(req) {
   try {
-    const { userId } = auth();
-    
-    if (!userId) {
+    const currentUserData = await currentUser();
+
+    if (!currentUserData) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
+    const userId = currentUserData.id;
 
-    const { userId: targetUserId, newCredits, refreshDate } = await req.json();
-    
-    // Verify the user is updating their own credits
-    if (userId !== targetUserId) {
-      return new NextResponse('Forbidden', { status: 403 });
-    }
+    const { newCredits, refreshDate } = await req.json();
 
     // Update user metadata in Clerk
     await clerkClient.users.updateUserMetadata(userId, {

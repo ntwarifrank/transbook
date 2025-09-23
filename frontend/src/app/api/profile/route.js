@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import User from '@/lib/models/User';
 
-export async function GET(_req) {
+export async function GET() {
   // Get the user ID from Clerk's authentication context
   const { userId } = auth();
 

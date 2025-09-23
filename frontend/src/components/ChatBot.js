@@ -41,7 +41,7 @@ const ChatBot = () => {
     }
     
     if (message.includes('credit') || message.includes('free')) {
-      return "New users receive 1000 free credits (equivalent to $5 worth of translation). Each word costs 1 credit. You can purchase more credits anytime through our secure payment system.";
+      return "New users receive 5000 free credits (equivalent to $5 worth of translation). Each word costs 1 credit. You can purchase more credits anytime through our secure payment system.";
     }
     
     if (message.includes('time') || message.includes('how long') || message.includes('speed')) {

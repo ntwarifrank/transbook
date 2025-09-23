@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 
 export async function GET(request, { params }) {
-  const dimensions = params.params;
+  const resolvedParams = await params;
+  const dimensions = resolvedParams.params;
   
   // Extract width and height from params like ['640', '360']
   const [width = '400', height = '300'] = dimensions || [];

@@ -1,13 +1,17 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-// Define routes that should not be protected
+// Define routes that should be protected (require authentication)
 const isProtectedRoute = createRouteMatcher([
   '/profile(.*)', // Protect the user profile page
+  '/api/translate(.*)', // Protect translation API
+  '/api/user(.*)', // Protect user-related APIs
+  '/api/progress(.*)', // Protect progress API
+  '/api/download(.*)', // Protect download API
 ]);
 
 export default clerkMiddleware((auth, req) => {
   if (isProtectedRoute(req)) {
-    auth().protect();
+    auth.protect();
   }
 });
 

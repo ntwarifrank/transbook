@@ -11,26 +11,6 @@ const Navigation = () => {
 
   const navigationItems = [
     { 
-      name: 'Tools', 
-      hasDropdown: true,
-      items: [
-        { name: 'AI Dubbing', to: '/tools/ai-dubbing' },
-        { name: 'Voice Cloning', to: '/tools/voice-cloning' },
-        { name: 'Video Translation', to: '/tools/video-translation' },
-        { name: 'Audio Translation', to: '/tools/audio-translation' }
-      ]
-    },
-    { 
-      name: 'Free tools', 
-      hasDropdown: true,
-      items: [
-        { name: 'Free Dubbing', to: '/free-tools/dubbing' },
-        { name: 'Free Translation', to: '/free-tools/translation' },
-        { name: 'Voice Generator', to: '/free-tools/voice-generator' },
-        { name: 'Subtitle Generator', to: '/free-tools/subtitle-generator' }
-      ]
-    },
-    { 
       name: 'Use Cases', 
       hasDropdown: true,
       items: [
@@ -155,6 +135,12 @@ const Navigation = () => {
 
             {/* Authentication Section */}
             <SignedIn>
+              <Link
+                href="/history"
+                className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium transition-colors duration-200 flex items-center"
+              >
+                📚 History
+              </Link>
               <UserButton afterSignOutUrl="/" />
             </SignedIn>
             <SignedOut>
@@ -236,6 +222,13 @@ const Navigation = () => {
               
               <div className="pt-4 border-t border-gray-200 space-y-2">
                 <SignedIn>
+                  <Link
+                    href="/history"
+                    className="block text-gray-700 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 text-base font-medium rounded-md transition-colors duration-200 flex items-center"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    📚 Translation History
+                  </Link>
                   <div className="flex items-center space-x-3 px-3 py-2">
                     <UserButton afterSignOutUrl="/" />
                     <p className="text-base font-medium text-gray-900">My Account</p>

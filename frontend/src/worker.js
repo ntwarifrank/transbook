@@ -36,9 +36,12 @@ const worker = new Worker('translation-queue', async (job) => {
         await job.updateProgress({ stage: 'Generating professional PDF...', progress: 93 });
         const pdfBuffer = await generatePdfFromHtml(translatedHtml, fileName);
 
-        // 4. Store the final PDF in Redis
-        const redisKey = `translation:pdf:${translationId}`;
-        await redisConnection.set(redisKey, pdfBuffer.toString('base64'), 'EX', 3600); // 1-hour expiry
+        // 4. Store the final PDF and the plain text in Redis
+        const pdfRedisKey = `translation:pdf:${translationId}`;
+        await redisConnection.set(pdfRedisKey, pdfBuffer.toString('base64'), 'EX', 3600); // 1-hour expiry for PDF
+
+        const textRedisKey = `translation:text:${translationId}`;
+        await redisConnection.set(textRedisKey, translatedText, 'EX', 3600); // 1-hour expiry for text
 
         await job.updateProgress({
             stage: 'Translation completed successfully!',

@@ -2,7 +2,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 
-const PricingModal = ({ wordCount, cost, onConfirm, onCancel, isSignedIn, userCredits, isLoading = false, userPlan = 'free' }) => {
+const PricingModal = ({ wordCount, cost, onConfirm, onCancel, isSignedIn, userCredits, isLoading = false, userPlan = 'free', onSubscribe }) => {
   if (wordCount === 0) return null;
   
   // Check if user is on free plan
@@ -23,20 +23,11 @@ const PricingModal = ({ wordCount, cost, onConfirm, onCancel, isSignedIn, userCr
         </div>
         
         {/* Translation Calculation - Same for all users */}
-        <div className="bg-blue-50 rounded-lg p-4 mb-4 border border-blue-200">
-          <div className="text-center">
-            <div className="text-sm font-medium text-blue-800 mb-2">Translation Calculation</div>
-            <div className="text-base text-gray-700">
-              <span className="font-semibold">{wordCount.toLocaleString()} words</span>
-              <span className="mx-2">×</span>
-              <span className="font-semibold">1 credit per word</span>
-              <span className="mx-2">=</span>
-              <span className="font-bold text-blue-600">{wordCount.toLocaleString()} credits</span>
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              (Equivalent to ${cost.toFixed(2)} at $0.005 per word)
-            </div>
-          </div>
+        {/* Emphasized Dollar Cost */}
+        <div className="text-center mb-6">
+          <p className="text-gray-600">Total Translation Cost</p>
+          <p className="text-4xl font-bold text-gray-900 my-2">${cost.toFixed(2)}</p>
+          <p className="text-sm text-gray-500">from {wordCount.toLocaleString()} words</p>
         </div>
 
         {/* For Non-Signed Users: Show Payment */}
@@ -66,52 +57,38 @@ const PricingModal = ({ wordCount, cost, onConfirm, onCancel, isSignedIn, userCr
 
         {/* For Signed Users: Show Credit Usage and Remaining Balance */}
         {isSignedIn && (
-          <div className="bg-gray-50 rounded-lg p-4 mb-4">
-            <div className="flex justify-between items-center text-sm mb-2">
-              <span className="text-gray-600">Your Current Plan:</span>
+          <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-2">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-600">Your Current Credits:</span>
               <span className="font-semibold text-gray-900">
-                {userCredits.toLocaleString()} Credits
-                {isFreeUser && <span className="text-green-600 text-xs ml-1">(Free Plan - 5K/month)</span>}
+                {userCredits.toLocaleString()}
+                {isFreeUser && <span className="text-green-600 text-xs ml-1">(Free Plan)</span>}
               </span>
             </div>
-            
-            <div className="flex justify-between items-center text-sm mb-2">
+            <div className="flex justify-between items-center text-sm">
               <span className="text-gray-600">Translation Cost:</span>
-              <span className="font-semibold text-gray-900">{wordCount.toLocaleString()} Credits</span>
+              <span className="font-semibold text-red-600">- {wordCount.toLocaleString()}</span>
             </div>
-            
-            <div className="border-t border-gray-200 pt-3 mt-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-800 font-semibold">Remaining Credits:</span>
-                <span className={`font-bold ${userCredits >= wordCount ? 'text-green-600' : 'text-red-600'}`}>
-                  {userCredits >= wordCount ? 
-                    `${(userCredits - wordCount).toLocaleString()} Credits` : 
-                    `Need ${(wordCount - userCredits).toLocaleString()} More Credits`
-                  }
-                </span>
-              </div>
+            <div className="border-t border-gray-200 my-2"></div>
+            <div className="flex justify-between items-center font-semibold">
+              <span className="text-gray-800">Remaining Credits:</span>
+              <span className={`${userCredits >= wordCount ? 'text-green-600' : 'text-red-600'}`}>
+                {(userCredits - wordCount).toLocaleString()}
+              </span>
             </div>
-            
-            {userCredits >= wordCount && (
-              <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                <div className="text-sm text-green-700">
-                  {isNewUser ? (
-                    <><strong>Welcome Bonus:</strong> You're using your free monthly credits! Enjoy professional AI translation.</>
-                  ) : (
-                    <><strong>Free Plan:</strong> You get 5,000 credits every month automatically. No subscription needed!</>
-                  )}
-                </div>
+
+            {userCredits < wordCount && (
+              <div className="mt-2 p-3 bg-red-50 rounded-lg border border-red-200 text-center">
+                <p className="text-sm text-red-700 font-semibold">You need to purchase additional credits.</p>
+                <p className="text-xs text-red-600 mt-1">
+                  You will be charged ${((wordCount - userCredits) * 0.005).toFixed(2)} to complete this translation.
+                </p>
               </div>
             )}
-            
-            {userCredits < wordCount && (
-              <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
-                <div className="text-sm text-red-700">
-                  <strong>Insufficient Credits:</strong> You need {(wordCount - userCredits).toLocaleString()} more credits to complete this translation.
-                </div>
-                <div className="text-xs text-red-600 mt-1">
-                  Additional cost: ${((wordCount - userCredits) * 0.005).toFixed(2)}
-                </div>
+
+            {userCredits >= wordCount && isNewUser && (
+              <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200 text-center">
+                <p className="text-sm text-green-700"><strong>Welcome Bonus!</strong> You are using your free monthly credits.</p>
               </div>
             )}
           </div>
@@ -121,7 +98,7 @@ const PricingModal = ({ wordCount, cost, onConfirm, onCancel, isSignedIn, userCr
           <button 
             onClick={onConfirm}
             disabled={isLoading}
-            className={`w-full py-3 rounded-lg font-semibold text-base flex items-center justify-center transition-all duration-300 shadow-md ${
+            className={`w-full py-3 rounded-lg font-semibold text-base flex items-center justify-center transition-all duration-300 shadow-lg ${
               isLoading 
                 ? 'bg-gray-400 cursor-not-allowed' 
                 : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 transform hover:scale-105'
@@ -140,9 +117,9 @@ const PricingModal = ({ wordCount, cost, onConfirm, onCancel, isSignedIn, userCr
                 {isSignedIn ? 
                   (userCredits >= wordCount ? 
                     `Translate Now (${wordCount.toLocaleString()} Credits)` : 
-                    `Buy ${(wordCount - userCredits).toLocaleString()} More Credits for $${((wordCount - userCredits) * 0.005).toFixed(2)}`
+                    `Buy Credits & Translate ($${((wordCount - userCredits) * 0.005).toFixed(2)})`
                   ) : 
-                  `Buy ${wordCount.toLocaleString()} Credits for $${cost.toFixed(2)}`
+                  `Sign Up & Pay $${cost.toFixed(2)}`
                 }
               </>
             )}
@@ -150,10 +127,10 @@ const PricingModal = ({ wordCount, cost, onConfirm, onCancel, isSignedIn, userCr
           <p className="text-xs text-gray-500 mt-2">
             {isSignedIn
               ? (userCredits >= wordCount ? 
-                  `${wordCount.toLocaleString()} credits will be deducted from your account.` :
-                  `You&apos;ll be redirected to purchase additional credits.`
+                  `These credits will be deducted from your account.` :
+                  `You will be redirected to our secure payment processor.`
                 )
-              : `Create account and pay $${cost.toFixed(2)} to start translation.`}
+              : `You'll be prompted to create a free account to complete your translation.`}
           </p>
         </div>
       </div>
